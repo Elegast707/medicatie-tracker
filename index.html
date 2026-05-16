@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ffffff">
+  <title>Medicatie Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --primary-color: #2c3e50;
+      --secondary-color: #3498db;
+      --background-color: #f9f9f9;
+      --text-color: #333;
+      --light-gray: #e8f4f8;
+      --white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--background-color);
+      color: var(--text-color);
+      line-height: 1.6;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1, h2 {
+      color: var(--primary-color);
+    }
+
+    .app {
+      background: var(--white);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .section {
+      margin-bottom: 30px;
+      padding: 15px;
+      border-radius: 8px;
+      background: var(--light-gray);
+    }
+
+    .medicatie-item {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: var(--white);
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .medicatie-item label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="time"], input[type="number"] {
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background-color: var(--primary-color);
+      color: var(--white);
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      padding: 10px;
+      background: var(--white);
+      margin-bottom: 5px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+    }
+
+    button {
+      background-color: var(--secondary-color);
+      color: var(--white);
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .settings-label {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Medicatie & Preparaten Tracker</h1>
+
+    <div class="section">
+      <h2>Instellingen</h2>
+      <div id="medicatie-settings">
+        <!-- Wordt dynamisch gevuld door JavaScript -->
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Vandaag</h2>
+      <ul id="today-list">
+        <!-- Wordt dynamisch gevuld door JavaScript -->
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Geschiedenis (laatste 30 dagen)</h2>
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <!-- Kolomkoppen worden dynamisch toegevoegd -->
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <!-- Rijen worden dynamisch toegevoegd -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Standaard medicatiemomenten
+    const defaultMedicatie = [
+      { id: 1, naam: "Lophlex", tijd: "08:00", reminderMinutes: 30 },
+      { id: 2, naam: "Lophlex", tijd: "12:00", reminderMinutes: 30 },
+      { id: 3, naam: "Lophlex", tijd: "18:00", reminderMinutes: 30 },
+      { id: 4, naam: "Calciumtabletten", tijd: "20:00", reminderMinutes: 15 }
+    ];
+
+    // Laad opgeslagen data
+    let medicatie = JSON.parse(localStorage.getItem('medicatieSettings')) || [...defaultMedicatie];
+    let history = JSON.parse(localStorage.getItem('medicatieHistory')) || {};
+
+    // Sla medicatie-instellingen op
+    const saveSettings = () => {
+      localStorage.setItem('medicatieSettings', JSON.stringify(medicatie));
+    };
+
+    // Sla geschiedenis op
+    const saveHistory = () => {
+      localStorage.setItem('medicatieHistory', JSON.stringify(history));
+    };
+
+    // Vink een medicatiemoment af
+    const toggleIngenomen = (id) => {
+      const today = new Date().toISOString().split('T')[0];
+      const updatedMedicatie = medicatie.map(item =>
+        item.id === id ? { ...item, ingenomen: !item.ingenomen } : item
+      );
+
+      // Update geschiedenis
+      if (!history[today]) {
+        history[today] = medicatie.map(m => ({ id: m.id, ingenomen: m.id === id ? true : false }));
+      } else {
+        history[today] = history[today].map(m =>
+          m.id === id ? { ...m, ingenomen: !m.ingenomen } : m
+        );
+      }
+
+      medicatie = updatedMedicatie;
+      saveSettings();
+      saveHistory();
+      renderApp();
+    };
+
+    // Update tijd voor een medicatiemoment
+    const updateTijd = (id, nieuweTijd) => {
+      medicatie = medicatie.map(item =>
+        item.id === id ? { ...item, tijd: nieuweTijd } : item
+      );
+      saveSettings();
+    };
+
+    // Update reminder-tijd
+    const updateReminderMinutes = (id, minutes) => {
+      medicatie = medicatie.map(item =>
+        item.id === id ? { ...item, reminderMinutes: parseInt(minutes) || 0 } : item
+      );
+      saveSettings();
+    };
+
+    // Haal geschiedenis van de afgelopen 30 dagen op
+    const getHistoryLast30Days = () => {
+      const today = new Date();
+      const historyEntries = [];
+      for (let i = 0; i < 30; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        if (history[dateStr]) {
+          historyEntries.push({ date: dateStr, data: history[dateStr] });
+        }
+      }
+      return historyEntries.reverse();
+    };
+
+    // Render de app
+    const renderApp = () => {
+      // Render instellingen
+      const settingsContainer = document.getElementById('medicatie-settings');
+      settingsContainer.innerHTML = '';
+      medicatie.forEach(item => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'medicatie-item';
+        itemDiv.innerHTML = `
+          <label class="settings-label">${item.naam}</label>
+          <label>
+            Tijd:
+            <input type="time" value="${item.tijd}" onchange="updateTijd(${item.id}, this.value)">
+          </label>
+          <label>
+            Reminder na:
+            <input type="number" value="${item.reminderMinutes}" min="0" onchange="updateReminderMinutes(${item.id}, this.value)">
+            minuten
+          </label>
+        `;
+        settingsContainer.appendChild(itemDiv);
+      });
+
+      // Render vandaag
+      const todayList = document.getElementById('today-list');
+      todayList.innerHTML = '';
+      medicatie.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <input type="checkbox" ${item.ingenomen ? 'checked' : ''} onchange="toggleIngenomen(${item.id})">
+          ${item.naam} (${item.tijd})
+        `;
+        todayList.appendChild(li);
+      });
+
+      // Render geschiedenis
+      const historyBody = document.getElementById('history-body');
+      const historyHeader = document.querySelector('#history-table thead tr');
+      const historyLast30Days = getHistoryLast30Days();
+
+      // Maak kolomkoppen
+      historyHeader.innerHTML = '<th>Datum</th>';
+      medicatie.forEach(item => {
+        const th = document.createElement('th');
+        th.textContent = item.naam;
+        historyHeader.appendChild(th);
+      });
+
+      // Maak rijen
+      historyBody.innerHTML = '';
+      historyLast30Days.forEach(entry => {
+        const tr = document.createElement('tr');
+        const dateTd = document.createElement('td');
+        dateTd.textContent = entry.date;
+        tr.appendChild(dateTd);
+
+        medicatie.forEach(item => {
+          const statusTd = document.createElement('td');
+          const status = entry.data.find(d => d.id === item.id);
+          statusTd.textContent = status?.ingenomen ? '✅' : '❌';
+          tr.appendChild(statusTd);
+        });
+
+        historyBody.appendChild(tr);
+      });
+    };
+
+    // Check reminders
+    const checkReminders = () => {
+      const now = new Date();
+      medicatie.forEach(item => {
+        const [hours, minutes] = item.tijd.split(':').map(Number);
+        const itemTime = new Date(now);
+        itemTime.setHours(hours, minutes, 0, 0);
+
+        const reminderTime = new Date(itemTime);
+        reminderTime.setMinutes(reminderTime.getMinutes() + item.reminderMinutes);
+
+        if (now >= itemTime && now <= reminderTime && !item.ingenomen) {
+          alert(`Herinnering: ${item.naam} (ingesteld voor ${item.tijd}) is nog niet afgevinkt!`);
+        }
+      });
+    };
+
+    // Check elke minuut
+    setInterval(checkReminders, 60000);
+
+    // Initial render
+    renderApp();
+
+    // Maak functies globaal beschikbaar
+    window.toggleIngenomen = toggleIngenomen;
+    window.updateTijd = updateTijd;
+    window.updateReminderMinutes = updateReminderMinutes;
+  </script>
+</body>
+</html>
