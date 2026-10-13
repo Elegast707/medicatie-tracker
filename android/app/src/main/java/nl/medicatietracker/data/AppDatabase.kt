@@ -4,17 +4,26 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [TrackedItem::class, LogEntry::class], version = 1, exportSchema = false)
+@Database(entities = [TrackedItem::class, LogEntry::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): TrackerDao
 
     companion object {
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "medicatie.db")
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(SeedCallback)
                 .build()
+
+        /** Versie 2: instelling per item of overslaan de reeks breekt. */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN skipAllowed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
     }
 
     /** Vult bij de eerste start het schema uit de oude web-app in. */

@@ -96,7 +96,11 @@ fun ManageScreen(app: MedApp) {
                         },
                         headlineContent = { Text(item.name) },
                         supportingContent = {
-                            val parts = listOfNotNull(item.details.takeIf { it.isNotBlank() }, repeatLabel(item.repeatMinutes))
+                            val parts = listOfNotNull(
+                                item.details.takeIf { it.isNotBlank() },
+                                repeatLabel(item.repeatMinutes),
+                                "overslaan mag".takeIf { item.skipAllowed },
+                            )
                             Text(parts.joinToString(" · "))
                         },
                         trailingContent = {
@@ -161,6 +165,7 @@ private fun EditItemDialog(
     var type by remember { mutableStateOf(initial.type) }
     var minuteOfDay by remember { mutableIntStateOf(initial.minuteOfDay) }
     var repeatMinutes by remember { mutableIntStateOf(initial.repeatMinutes) }
+    var skipAllowed by remember { mutableStateOf(initial.skipAllowed) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showRepeatMenu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -211,6 +216,21 @@ private fun EditItemDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Overslaan breekt de reeks niet", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (skipAllowed) {
+                                "Overslaan telt als afgevinkt voor je reeks."
+                            } else {
+                                "Alleen ${if (type == ItemType.MEDICATIE) "nemen" else "doen"} telt; overslaan breekt je reeks."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = skipAllowed, onCheckedChange = { skipAllowed = it })
+                }
                 if (!isNew) {
                     TextButton(onClick = { confirmDelete = true }) {
                         Text("Verwijderen", color = MaterialTheme.colorScheme.error)
@@ -229,6 +249,7 @@ private fun EditItemDialog(
                             type = type,
                             minuteOfDay = minuteOfDay,
                             repeatMinutes = repeatMinutes,
+                            skipAllowed = skipAllowed,
                         ),
                     )
                 },

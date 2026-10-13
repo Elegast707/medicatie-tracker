@@ -15,13 +15,16 @@ import nl.medicatietracker.MainActivity
 import nl.medicatietracker.R
 import nl.medicatietracker.data.ItemType
 import nl.medicatietracker.data.LogStatus
+import nl.medicatietracker.data.Streaks
 import nl.medicatietracker.data.TrackedItem
 import nl.medicatietracker.data.doneLabel
 import nl.medicatietracker.data.formatMinute
 
 object Notifications {
     private const val CHANNEL_ID = "herinneringen"
+    private const val ACHIEVEMENT_CHANNEL_ID = "prestaties"
     private const val TEST_NOTIFICATION_ID = 999_999
+    private const val MILESTONE_NOTIFICATION_ID = 888_888
 
     const val ACTION_LOG = "nl.medicatietracker.LOG"
     const val EXTRA_ITEM_ID = "itemId"
@@ -33,7 +36,10 @@ object Notifications {
             description = "Herinneringen voor medicatie en taken"
             enableVibration(true)
         }
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        val achievements = NotificationChannel(ACHIEVEMENT_CHANNEL_ID, "Prestaties", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Felicitaties als je een week, maand of langer alles hebt afgevinkt"
+        }
+        context.getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(channel, achievements))
     }
 
     fun canNotify(context: Context): Boolean {
@@ -69,18 +75,32 @@ object Notifications {
         notify(context, TEST_NOTIFICATION_ID, builder)
     }
 
+    fun showMilestone(context: Context, milestone: Int) {
+        val text = Streaks.message(milestone)
+        val builder = baseBuilder(context, MILESTONE_NOTIFICATION_ID, "🎉 ${Streaks.title(milestone)}", text, ACHIEVEMENT_CHANNEL_ID)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+        notify(context, MILESTONE_NOTIFICATION_ID, builder)
+    }
+
     fun cancel(context: Context, itemId: Long) {
         NotificationManagerCompat.from(context).cancel(itemId.toInt())
     }
 
-    private fun baseBuilder(context: Context, requestCode: Int, title: String, text: String): NotificationCompat.Builder {
+    private fun baseBuilder(
+        context: Context,
+        requestCode: Int,
+        title: String,
+        text: String,
+        channelId: String = CHANNEL_ID,
+    ): NotificationCompat.Builder {
         val openApp = PendingIntent.getActivity(
             context,
             requestCode,
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)

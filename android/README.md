@@ -12,8 +12,12 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
 - **Geschiedenis**: per dag wat je gedaan, overgeslagen of gemist hebt, het percentage per item en
   het aantal dagen op rij dat alles compleet was. Tik op een regel om achteraf iets af te vinken.
   Met het deel-icoon exporteer je alles als CSV-bestand (te openen in Excel).
+- **Prestaties**: heb je alles afgevinkt, dan groeit je reeks. Bij 7, 30 en 90 dagen op rij krijg
+  je een felicitatie, en als je doorgaat ook elke volgende week en bij 180 en 365 dagen. In
+  Geschiedenis zie je je badges, je huidige reeks en je beste reeks ooit.
 - **Beheren**: items toevoegen, wijzigen, tijdelijk uitzetten of verwijderen (de geschiedenis blijft
-  bewaard). Via *Testmelding sturen* controleer je of meldingen werken.
+  bewaard). Per item stel je in of *Overslaan* je reeks breekt. Via *Testmelding sturen* controleer
+  je of meldingen werken.
 
 Bij de eerste start staat het schema uit de oude web-app er al in (Lophlex 08:00, 12:00 en 18:00,
 calciumtabletten om 20:00). Alle gegevens blijven op je telefoon.

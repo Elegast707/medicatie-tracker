@@ -1,5 +1,6 @@
 package nl.medicatietracker.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -25,6 +26,8 @@ data class TrackedItem(
     val minuteOfDay: Int,
     /** Elke zoveel minuten opnieuw herinneren tot het is afgevinkt; 0 = niet herhalen. */
     val repeatMinutes: Int = 15,
+    /** Overslaan telt als afgevinkt voor de reeks (anders breekt overslaan de reeks). */
+    @ColumnInfo(defaultValue = "0") val skipAllowed: Boolean = false,
     val active: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     /** Gezet bij verwijderen, zodat de geschiedenis bewaard blijft. */
