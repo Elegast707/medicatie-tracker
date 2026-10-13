@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -33,11 +34,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import nl.medicatietracker.data.History
 import nl.medicatietracker.data.StarEntry
+import nl.medicatietracker.data.Streaks
 import nl.medicatietracker.ui.HistoryScreen
 import nl.medicatietracker.ui.ManageScreen
 import nl.medicatietracker.ui.MedTheme
-import nl.medicatietracker.ui.StarBadge
+import nl.medicatietracker.ui.StreakBadge
 import nl.medicatietracker.ui.StarCollectionDialog
 import nl.medicatietracker.ui.TodayScreen
 import nl.medicatietracker.ui.rememberNow
@@ -69,7 +72,13 @@ private val tabs = listOf(
 private fun AppRoot(app: MedApp, star: StarEntry?) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var showStars by rememberSaveable { mutableStateOf(false) }
-    val today = rememberNow().value.toLocalDate()
+    val now by rememberNow()
+    val today = now.toLocalDate()
+    val items by app.repository.allItems.collectAsStateWithLifecycle(emptyList())
+    val logs by app.repository.allLogs.collectAsStateWithLifecycle(emptyList())
+    val streakDays = remember(items, logs, now) {
+        Streaks.compute(History.build(items, logs, History.firstDay(items, logs) ?: today, today, now)).current
+    }
 
     // Een reeks kan ook breken zonder dat er iets wordt afgevinkt, dus bij openen en elke nieuwe dag bijwerken.
     LaunchedEffect(today) { app.appScope.launch { app.repository.syncStars() } }
@@ -82,7 +91,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
-                actions = { StarBadge(star, onClick = { showStars = true }) },
+                actions = { StreakBadge(streakDays, star, onClick = { showStars = true }) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,

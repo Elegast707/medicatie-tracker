@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gegenereerd gouden vinkje: reeks van minstens 1 dag, nog geen ster. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#F2B705" android:pathData="M24,3A21,21 0,1 1,23.99,3Z" />
+    <path android:fillColor="#FFD95A" android:pathData="M24,3A21,21 0,0 0,9.15,38.85L38.85,9.15A20.93,20.93 0,0 0,24,3Z" />
+    <path android:fillColor="#C99000" android:pathData="M38.85,9.15L9.15,38.85A21,21 0,0 0,38.85,9.15Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#8A6200"
+        android:strokeWidth="1.6"
+        android:pathData="M24,3A21,21 0,1 1,23.99,3Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#8A6200"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M13.5,25L20.5,32L35,17" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M13.5,25L20.5,32L35,17" />
+</vector>

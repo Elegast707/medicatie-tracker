@@ -15,7 +15,8 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
 - **Prestaties**: heb je alles afgevinkt, dan groeit je reeks. Bij 7, 30 en 90 dagen op rij krijg
   je een felicitatie, en als je doorgaat ook elke volgende week en bij 180 en 365 dagen. In
   Geschiedenis zie je je badges, je huidige reeks en je beste reeks ooit.
-- **Sterren**: rechtsboven staat een ster zolang je reeks loopt: brons vanaf 7 dagen, zilver vanaf
+- **Sterren**: rechtsboven zie je hoeveel dagen je reeks is. Vanaf 1 dag staat daarnaast een gouden
+  vinkje, dat bij 7 dagen een ster wordt: brons vanaf 7 dagen, zilver vanaf
   30, goud vanaf 90 en blauw vanaf 365. Met een ster kleurt de app goud, zonder ster grijs. Wordt
   een ster vervangen door een hogere of breekt je reeks, dan gaat hij naar je sterrencollectie
   (tik op de ster, of via Beheren).
