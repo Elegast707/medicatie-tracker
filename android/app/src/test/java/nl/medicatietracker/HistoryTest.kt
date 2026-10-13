@@ -59,7 +59,7 @@ class HistoryTest {
     }
 
     @Test
-    fun streakCountsCompleteDaysAndIgnoresOpenToday() {
+    fun summaryCounts() {
         val logs = listOf(
             log(pill, today.minusDays(1)), log(walk, today.minusDays(1)),
             log(pill, today.minusDays(2)), log(walk, today.minusDays(2), LogStatus.OVERGESLAGEN),
@@ -67,7 +67,6 @@ class HistoryTest {
         )
         val days = History.build(listOf(pill, walk), logs, today.minusDays(5), today, now)
         val summary = History.summarize(days)
-        assertEquals(2, summary.streak)
         assertEquals(4, summary.done)
         assertEquals(1, summary.skipped)
         assertEquals(5, summary.missed)

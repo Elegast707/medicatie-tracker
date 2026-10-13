@@ -37,8 +37,8 @@ interface TrackerDao {
     @Query("SELECT * FROM logs WHERE epochDay = :epochDay")
     fun observeLogsForDay(epochDay: Long): Flow<List<LogEntry>>
 
-    @Query("SELECT * FROM logs WHERE epochDay BETWEEN :fromDay AND :toDay")
-    fun observeLogsBetween(fromDay: Long, toDay: Long): Flow<List<LogEntry>>
+    @Query("SELECT * FROM logs")
+    fun observeAllLogs(): Flow<List<LogEntry>>
 
     @Query("SELECT * FROM logs")
     suspend fun allLogs(): List<LogEntry>
