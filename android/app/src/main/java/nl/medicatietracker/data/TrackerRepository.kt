@@ -2,6 +2,8 @@ package nl.medicatietracker.data
 
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import nl.medicatietracker.reminders.Notifications
 import nl.medicatietracker.reminders.ReminderScheduler
 import java.time.LocalDate
@@ -23,6 +25,12 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
 
     val allLogs: Flow<List<LogEntry>> = dao.observeAllLogs()
 
+    /** De ster die nu rechtsboven staat, of null zonder reeks van minstens een week. */
+    val heldStar: Flow<StarEntry?> = dao.observeHeldStar()
+    val collectedStars: Flow<List<StarEntry>> = dao.observeCollectedStars()
+
+    private val starLock = Mutex()
+
     suspend fun setStatus(itemId: Long, epochDay: Long, status: LogStatus) {
         val item = dao.item(itemId) ?: return
         dao.upsertLog(
@@ -39,11 +47,26 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
         Notifications.cancel(context, itemId)
         reschedule(item)
         celebrateMilestone()
+        syncStars()
     }
 
     suspend fun clearStatus(itemId: Long, epochDay: Long) {
         dao.deleteLog(itemId, epochDay)
         dao.item(itemId)?.let { reschedule(it) }
+        syncStars()
+    }
+
+    /**
+     * Zet de ster rechtsboven gelijk met de huidige reeks en bewaart vervangen of verloren sterren
+     * in de verzameling. Ook nodig als er niets is afgevinkt: een reeks breekt vanzelf na een gemiste dag.
+     */
+    suspend fun syncStars() {
+        starLock.withLock {
+            val now = LocalDateTime.now()
+            val streak = currentStreak(now) ?: StreakInfo(0, null, 0)
+            val changes = Stars.update(streak, dao.heldStar(), now.toLocalDate())
+            if (changes.isNotEmpty()) dao.saveStars(changes)
+        }
     }
 
     suspend fun save(item: TrackedItem) {
@@ -70,11 +93,8 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
 
     /** Stuurt een felicitatie als de huidige reeks een nieuwe mijlpaal heeft bereikt. */
     private suspend fun celebrateMilestone() {
-        val items = dao.allItems()
-        val logs = dao.allLogs()
         val now = LocalDateTime.now()
-        val firstDay = History.firstDay(items, logs) ?: return
-        val streak = Streaks.compute(History.build(items, logs, firstDay, now.toLocalDate(), now))
+        val streak = currentStreak(now) ?: return
 
         val prefs = context.getSharedPreferences(PREFS_ACHIEVEMENTS, Context.MODE_PRIVATE)
         val celebratedOn = prefs.getLong(KEY_CELEBRATED_ON, prefs.getLong(KEY_STREAK_START, Long.MIN_VALUE))
@@ -86,6 +106,13 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
             .putInt(KEY_MILESTONE, milestone)
             .apply()
         Notifications.showMilestone(context, milestone)
+    }
+
+    private suspend fun currentStreak(now: LocalDateTime): StreakInfo? {
+        val items = dao.allItems()
+        val logs = dao.allLogs()
+        val firstDay = History.firstDay(items, logs) ?: return null
+        return Streaks.compute(History.build(items, logs, firstDay, now.toLocalDate(), now))
     }
 
     private suspend fun reschedule(item: TrackedItem) {

@@ -59,7 +59,7 @@ private fun repeatLabel(minutes: Int): String =
     if (minutes <= 0) "Niet herhalen" else "Elke $minutes minuten herhalen"
 
 @Composable
-fun ManageScreen(app: MedApp) {
+fun ManageScreen(app: MedApp, onOpenStars: () -> Unit) {
     val context = LocalContext.current
     val items by app.repository.items.collectAsStateWithLifecycle(emptyList())
     // null = geen dialoog, item met id 0 = nieuw item
@@ -123,6 +123,19 @@ fun ManageScreen(app: MedApp) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         OutlinedButton(onClick = { Notifications.showTest(context) }) { Text("Testmelding sturen") }
+                    }
+                }
+            }
+            item {
+                Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Sterren", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Brons bij 7 dagen op rij, zilver bij 30, goud bij 90 en blauw bij 365. " +
+                                "Vervangen en verloren sterren bewaar je in je verzameling.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        OutlinedButton(onClick = onOpenStars) { Text("Sterrencollectie bekijken") }
                     }
                 }
             }

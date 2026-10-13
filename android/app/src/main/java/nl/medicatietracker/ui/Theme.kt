@@ -23,26 +23,89 @@ import kotlinx.coroutines.delay
 import nl.medicatietracker.data.RowStatus
 import java.time.LocalDateTime
 
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF5B2A9E),
+// Goud zolang er een ster rechtsboven staat, anders grijs.
+private val GoldLight = lightColorScheme(
+    primary = Color(0xFF8A6100),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFEADDFF),
-    onPrimaryContainer = Color(0xFF21005D),
-    secondaryContainer = Color(0xFFE8DEF8),
-    onSecondaryContainer = Color(0xFF1D192B),
+    primaryContainer = Color(0xFFFFDF9E),
+    onPrimaryContainer = Color(0xFF2B1D00),
+    secondaryContainer = Color(0xFFF5E1B8),
+    onSecondaryContainer = Color(0xFF261A00),
+    tertiaryContainer = Color(0xFFFFE8B0),
+    onTertiaryContainer = Color(0xFF2B1D00),
+    background = Color(0xFFFFF8EC),
+    surface = Color(0xFFFFF8EC),
+    surfaceVariant = Color(0xFFF0E2C8),
+    surfaceContainerLow = Color(0xFFFCF2E0),
+    surfaceContainer = Color(0xFFF8EBD0),
+    surfaceContainerHigh = Color(0xFFF4E6CC),
+    surfaceContainerHighest = Color(0xFFF0E2C8),
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFFD0BCFF),
-    onPrimary = Color(0xFF381E72),
-    primaryContainer = Color(0xFF4F378B),
-    onPrimaryContainer = Color(0xFFEADDFF),
+private val GoldDark = darkColorScheme(
+    primary = Color(0xFFF5C451),
+    onPrimary = Color(0xFF412D00),
+    primaryContainer = Color(0xFF5E4200),
+    onPrimaryContainer = Color(0xFFFFDF9E),
+    secondaryContainer = Color(0xFF54452A),
+    onSecondaryContainer = Color(0xFFF5E1B8),
+    tertiaryContainer = Color(0xFF5E4200),
+    onTertiaryContainer = Color(0xFFFFDF9E),
+    background = Color(0xFF18130A),
+    surface = Color(0xFF18130A),
+    surfaceVariant = Color(0xFF4D4639),
+    surfaceContainerLow = Color(0xFF201B10),
+    surfaceContainer = Color(0xFF251F14),
+    surfaceContainerHigh = Color(0xFF30291E),
+    surfaceContainerHighest = Color(0xFF3B3428),
+)
+
+private val GreyLight = lightColorScheme(
+    primary = Color(0xFF5F6368),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE1E3E6),
+    onPrimaryContainer = Color(0xFF1F2124),
+    secondaryContainer = Color(0xFFE3E3E3),
+    onSecondaryContainer = Color(0xFF1F1F1F),
+    tertiaryContainer = Color(0xFFE6E6E6),
+    onTertiaryContainer = Color(0xFF1F1F1F),
+    background = Color(0xFFF7F7F7),
+    surface = Color(0xFFF7F7F7),
+    surfaceVariant = Color(0xFFE2E2E2),
+    surfaceContainerLow = Color(0xFFF2F2F2),
+    surfaceContainer = Color(0xFFEDEDED),
+    surfaceContainerHigh = Color(0xFFE8E8E8),
+    surfaceContainerHighest = Color(0xFFE2E2E2),
+)
+
+private val GreyDark = darkColorScheme(
+    primary = Color(0xFFC4C7CB),
+    onPrimary = Color(0xFF2E3134),
+    primaryContainer = Color(0xFF45484C),
+    onPrimaryContainer = Color(0xFFE1E3E6),
+    secondaryContainer = Color(0xFF444444),
+    onSecondaryContainer = Color(0xFFE3E3E3),
+    tertiaryContainer = Color(0xFF444444),
+    onTertiaryContainer = Color(0xFFE3E3E3),
+    background = Color(0xFF141414),
+    surface = Color(0xFF141414),
+    surfaceVariant = Color(0xFF444444),
+    surfaceContainerLow = Color(0xFF1C1C1C),
+    surfaceContainer = Color(0xFF202020),
+    surfaceContainerHigh = Color(0xFF2A2A2A),
+    surfaceContainerHighest = Color(0xFF353535),
 )
 
 @Composable
-fun MedTheme(content: @Composable () -> Unit) {
+fun MedTheme(gold: Boolean, content: @Composable () -> Unit) {
+    val dark = isSystemInDarkTheme()
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = when {
+            gold && dark -> GoldDark
+            gold -> GoldLight
+            dark -> GreyDark
+            else -> GreyLight
+        },
         content = content,
     )
 }
