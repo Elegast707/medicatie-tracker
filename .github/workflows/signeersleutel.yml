@@ -1,0 +1,33 @@
+name: Signeersleutel maken (eenmalig)
+
+# Maakt een nieuwe signeersleutel aan en zet die als (tijdelijk) downloadbaar bestand klaar.
+# Kopieer de inhoud daarna naar de repository secrets en verwijder de download. Zie README.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  keystore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Sleutel genereren
+        run: |
+          mkdir sleutel
+          PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$PASSWORD"
+          keytool -genkeypair -keystore release.keystore -alias medicatietracker \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$PASSWORD" -keypass "$PASSWORD" -dname "CN=Medicatie Tracker"
+          base64 -w0 release.keystore > sleutel/SIGNING_KEYSTORE_BASE64.txt
+          printf '%s' "$PASSWORD" > sleutel/SIGNING_PASSWORD.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signeersleutel
+          path: sleutel/
+          retention-days: 1
