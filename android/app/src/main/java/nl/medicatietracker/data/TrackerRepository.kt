@@ -8,6 +8,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 private const val PREFS_ACHIEVEMENTS = "prestaties"
+private const val KEY_CELEBRATED_ON = "gevierdOp"
+// Oudere versies bewaarden de start van de gevierde reeks; die dag ligt nooit na de vierdag.
 private const val KEY_STREAK_START = "gevierdeReeksStart"
 private const val KEY_MILESTONE = "gevierdeMijlpaal"
 
@@ -66,28 +68,21 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
 
     suspend fun exportData(): Pair<List<TrackedItem>, List<LogEntry>> = dao.allItems() to dao.allLogs()
 
-    /**
-     * Stuurt een felicitatie als de huidige reeks een nieuwe mijlpaal heeft bereikt. Elke mijlpaal
-     * wordt per reeks maar één keer gevierd, ook als je iets ongedaan maakt en opnieuw afvinkt.
-     */
+    /** Stuurt een felicitatie als de huidige reeks een nieuwe mijlpaal heeft bereikt. */
     private suspend fun celebrateMilestone() {
         val items = dao.allItems()
         val logs = dao.allLogs()
         val now = LocalDateTime.now()
         val firstDay = History.firstDay(items, logs) ?: return
         val streak = Streaks.compute(History.build(items, logs, firstDay, now.toLocalDate(), now))
-        val start = streak.currentStart?.toEpochDay() ?: return
-        val milestone = Streaks.highestMilestoneUpTo(streak.current) ?: return
 
         val prefs = context.getSharedPreferences(PREFS_ACHIEVEMENTS, Context.MODE_PRIVATE)
-        val celebratedStart = prefs.getLong(KEY_STREAK_START, Long.MAX_VALUE)
-        val celebratedMilestone = prefs.getInt(KEY_MILESTONE, 0)
-        // Een reeks die achteraf naar achteren is verlengd, is nog steeds dezelfde reeks.
-        val sameStreak = start <= celebratedStart && celebratedStart != Long.MAX_VALUE
-        if (sameStreak && milestone <= celebratedMilestone) return
+        val celebratedOn = prefs.getLong(KEY_CELEBRATED_ON, prefs.getLong(KEY_STREAK_START, Long.MIN_VALUE))
+        val last = Celebration(prefs.getInt(KEY_MILESTONE, 0), celebratedOn).takeIf { celebratedOn != Long.MIN_VALUE }
+        val milestone = Streaks.milestoneToCelebrate(streak, last) ?: return
 
         prefs.edit()
-            .putLong(KEY_STREAK_START, start)
+            .putLong(KEY_CELEBRATED_ON, now.toLocalDate().toEpochDay())
             .putInt(KEY_MILESTONE, milestone)
             .apply()
         Notifications.showMilestone(context, milestone)

@@ -13,6 +13,9 @@ data class StreakInfo(
 
 data class Badge(val days: Int, val label: String)
 
+/** De laatst gevierde mijlpaal en de dag (epochDay) waarop die gevierd is. */
+data class Celebration(val milestone: Int, val epochDay: Long)
+
 object Streaks {
     val BADGES = listOf(
         Badge(7, "Week"),
@@ -68,6 +71,19 @@ object Streaks {
     fun isMilestone(days: Int): Boolean = days > 0 && (days % 7 == 0 || days in SPECIAL_MILESTONES)
 
     fun highestMilestoneUpTo(days: Int): Int? = (days downTo 1).firstOrNull { isMilestone(it) }
+
+    /**
+     * De mijlpaal die nu gevierd moet worden, of null. Elke mijlpaal wordt per reeks maar één keer
+     * gevierd, ook als je iets ongedaan maakt en opnieuw afvinkt of een eerdere dag aanpast.
+     */
+    fun milestoneToCelebrate(streak: StreakInfo, last: Celebration?): Int? {
+        val start = streak.currentStart ?: return null
+        val milestone = highestMilestoneUpTo(streak.current) ?: return null
+        // Een reeks die al liep toen er voor het laatst gevierd werd, is nog dezelfde reeks: ook als
+        // hij achteraf naar achteren is verlengd, of ingekort doordat een eerdere dag is aangepast.
+        val sameStreak = last != null && start.toEpochDay() <= last.epochDay
+        return if (sameStreak && milestone <= last!!.milestone) null else milestone
+    }
 
     fun title(milestone: Int): String = when (milestone) {
         7 -> "Een week compleet!"
