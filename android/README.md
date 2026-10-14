@@ -84,5 +84,10 @@ Zelf bouwen: open de map `android/` in Android Studio, of voer `./gradlew assemb
   (`python3 tools/generate_sprites.py`, vereist Pillow) en staat in `app/src/main/res/drawable-nodpi/`.
   Een plaatje vervangen kan door een PNG met dezelfde naam en afmetingen neer te zetten
   (blobje en accessoires 32×32, eten 16×16, achtergrond 64×48).
-- Lettertype *Press Start 2P* door CodeMan38, onder de SIL Open Font License 1.1
+- De hele app staat in 32-bit pixelstijl: pixelkaders, blokjesbalken en eigen pixelicoontjes.
+  De icoontjes (`ic_px_*`), de sterren en het gouden vinkje zijn vector drawables uit
+  `tools/generate_pixel_icons.py` (`python3 tools/generate_pixel_icons.py`, geen extra pakketten nodig).
+- Koppen in *Press Start 2P* door CodeMan38, onder de SIL Open Font License 1.1
   (`licenses/OFL-PressStart2P.txt`).
+- Gewone tekst in *Pixelify Sans* door Stefie Justprince, onder de SIL Open Font License 1.1
+  (`licenses/OFL-PixelifySans.txt`).

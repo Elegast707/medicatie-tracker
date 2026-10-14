@@ -12,7 +12,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,15 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +39,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.medicatietracker.MedApp
+import nl.medicatietracker.R
 import nl.medicatietracker.data.DUTCH
 import nl.medicatietracker.data.ItemType
 import nl.medicatietracker.data.LogEntry
@@ -106,10 +101,7 @@ fun TodayScreen(app: MedApp) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text("$doneCount van ${items.size} afgevinkt", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.size(6.dp))
-                    LinearProgressIndicator(
-                        progress = { if (items.isEmpty()) 0f else doneCount.toFloat() / items.size },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    PixelProgressBar(progress = if (items.isEmpty()) 0f else doneCount.toFloat() / items.size)
                 }
             }
             for (type in ItemType.entries) {
@@ -150,8 +142,10 @@ fun TodayScreen(app: MedApp) {
 
 /** Felgroen, zodat "Genomen" er in zowel het gouden als het grijze thema uitspringt. */
 private val DoneGreen = Color(0xFF1E8E3E)
+private val DoneGreenDark = Color(0xFF136B2C)
+private val DoneGreenEdge = Color(0xFF0B2E12)
 
-/** Groen rondje met een wit vinkje. Net afgevinkt? Dan springt het met een veerkrachtige animatie tevoorschijn. */
+/** Groen pixelblokje met een wit vinkje. Net afgevinkt? Dan springt het met een veerkrachtige animatie tevoorschijn. */
 @Composable
 private fun DoneCheck(log: LogEntry) {
     val fresh = remember(log.id) { System.currentTimeMillis() - log.loggedAt < 3_000 }
@@ -170,10 +164,10 @@ private fun DoneCheck(log: LogEntry) {
                 scaleY = pop.value
                 rotationZ = turn.value
             }
-            .background(DoneGreen, CircleShape),
+            .drawBehind { pixelFrame(DoneGreen, Color.White.copy(alpha = 0.35f), DoneGreenDark, 3.dp.toPx(), DoneGreenEdge) },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Filled.Check, contentDescription = "Gedaan", tint = Color.White, modifier = Modifier.size(24.dp))
+        Icon(painterResource(R.drawable.ic_px_check), contentDescription = "Gedaan", tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -185,22 +179,18 @@ private fun TodayItemCard(
     onLog: (LogStatus) -> Unit,
     onUndo: () -> Unit,
 ) {
-    val colors = when {
-        log != null -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        overdue -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-        else -> CardDefaults.cardColors()
+    val container = when {
+        log != null -> MaterialTheme.colorScheme.surfaceVariant
+        overdue -> MaterialTheme.colorScheme.errorContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHighest
     }
-    Card(
-        colors = colors,
+    PixelCard(
+        container = container,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    formatMinute(item.minuteOfDay),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
+                Text(formatMinute(item.minuteOfDay), style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.name, style = MaterialTheme.typography.titleMedium)
@@ -219,21 +209,24 @@ private fun TodayItemCard(
             Spacer(Modifier.size(8.dp))
             if (log == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(
+                    PixelButton(
                         onClick = { onLog(LogStatus.GEDAAN) },
-                        colors = ButtonDefaults.buttonColors(containerColor = DoneGreen, contentColor = Color.White),
+                        fill = DoneGreen,
                         modifier = Modifier.weight(1f).height(56.dp),
                     ) {
-                        Icon(Icons.Filled.Check, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(item.type.doneLabel(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Icon(painterResource(R.drawable.ic_px_check), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(item.type.doneLabel(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     Spacer(Modifier.width(4.dp))
-                    TextButton(
-                        onClick = { onLog(LogStatus.OVERGESLAGEN) },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    ) {
-                        Text("Overslaan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Overslaan bewust klein en grijs, zodat "Genomen" de knop is die opvalt.
+                    IconButton(onClick = { onLog(LogStatus.OVERGESLAGEN) }) {
+                        Icon(
+                            painterResource(R.drawable.ic_px_close),
+                            contentDescription = "Overslaan",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
             } else {
@@ -296,8 +289,8 @@ private fun PermissionBanners() {
 
 @Composable
 private fun Banner(text: String, action: String, onClick: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    PixelCard(
+        container = MaterialTheme.colorScheme.tertiaryContainer,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
         Column(Modifier.padding(16.dp)) {

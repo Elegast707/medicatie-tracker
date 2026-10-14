@@ -5,7 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,15 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,13 +36,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.medicatietracker.MedApp
+import nl.medicatietracker.R
 import nl.medicatietracker.data.Badge
 import nl.medicatietracker.data.DUTCH
 import nl.medicatietracker.data.History
@@ -111,7 +108,7 @@ fun HistoryScreen(app: MedApp) {
                     onClick = { exportLauncher.launch("medicatie-geschiedenis-$today.csv") },
                     modifier = Modifier.padding(end = 8.dp, top = 8.dp),
                 ) {
-                    Icon(Icons.Filled.Share, contentDescription = "Exporteren als CSV")
+                    Icon(painterResource(R.drawable.ic_px_export), contentDescription = "Exporteren als CSV", modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -153,15 +150,15 @@ fun HistoryScreen(app: MedApp) {
 
 @Composable
 private fun AchievementsCard(streak: StreakInfo) {
-    Card(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+    PixelCard(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row {
                 Column(Modifier.weight(1f)) {
-                    Text("${streak.current}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("${streak.current}", style = MaterialTheme.typography.headlineMedium)
                     Text(if (streak.current == 1) "dag op rij compleet" else "dagen op rij compleet", style = MaterialTheme.typography.bodySmall)
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("${streak.best}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text("${streak.best}", style = MaterialTheme.typography.headlineMedium)
                     Text("beste reeks ooit", style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -186,10 +183,10 @@ private fun AchievementsCard(streak: StreakInfo) {
 @Composable
 private fun BadgeTile(badge: Badge, earned: Boolean, current: Int, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = CutCornerShape(3.dp),
         color = if (earned) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         contentColor = if (earned) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        border = if (earned) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = if (earned) null else BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier,
     ) {
         Column(
@@ -197,7 +194,7 @@ private fun BadgeTile(badge: Badge, earned: Boolean, current: Int, modifier: Mod
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (earned) {
-                Icon(Icons.Filled.Star, contentDescription = "Behaald", modifier = Modifier.size(22.dp))
+                Image(painterResource(R.drawable.ic_star_gold), contentDescription = "Behaald", modifier = Modifier.size(24.dp))
             } else {
                 Text("${minOf(current, badge.days)}/${badge.days}", style = MaterialTheme.typography.labelSmall, maxLines = 1)
             }
@@ -208,10 +205,10 @@ private fun BadgeTile(badge: Badge, earned: Boolean, current: Int, modifier: Mod
 
 @Composable
 private fun SummaryCard(summary: Summary) {
-    Card(Modifier.fillMaxWidth().padding(16.dp)) {
+    PixelCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Column {
-                Text("${summary.percentage}%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("${summary.percentage}%", style = MaterialTheme.typography.headlineMedium)
                 Text("afgevinkt in deze periode", style = MaterialTheme.typography.bodySmall)
             }
             Text(
@@ -225,9 +222,10 @@ private fun SummaryCard(summary: Summary) {
                         Text(stats.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                         Text("${stats.done}/${stats.total} · ${stats.percentage}%", style = MaterialTheme.typography.bodyMedium)
                     }
-                    LinearProgressIndicator(
-                        progress = { stats.percentage / 100f },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    PixelProgressBar(
+                        progress = stats.percentage / 100f,
+                        modifier = Modifier.padding(top = 4.dp),
+                        segments = 10,
                     )
                 }
             }
@@ -237,7 +235,7 @@ private fun SummaryCard(summary: Summary) {
 
 @Composable
 private fun DayCard(day: HistoryDay, onRowClick: (HistoryRow) -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+    PixelCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Column(Modifier.padding(vertical = 12.dp)) {
             Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -259,7 +257,7 @@ private fun DayCard(day: HistoryDay, onRowClick: (HistoryRow) -> Unit) {
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    StatusIcon(row.status, Modifier.size(20.dp))
+                    StatusIcon(row.status, Modifier.size(24.dp))
                     Spacer(Modifier.width(12.dp))
                     Text(formatMinute(row.minuteOfDay), style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.width(12.dp))

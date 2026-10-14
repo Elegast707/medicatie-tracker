@@ -12,10 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Card
+import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,9 +56,9 @@ fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
     if (days < 1 && star == null) return
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = CutCornerShape(4.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
         modifier = Modifier.padding(end = 8.dp),
     ) {
         Row(
@@ -72,7 +69,6 @@ fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
             Text(
                 "$days",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
@@ -101,7 +97,7 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit) {
                 TopAppBar(
                     title = { Text("Sterrencollectie") },
                     navigationIcon = {
-                        IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Sluiten") }
+                        IconButton(onClick = onDismiss) { Icon(painterResource(R.drawable.ic_px_close), contentDescription = "Sluiten", modifier = Modifier.size(24.dp)) }
                     },
                 )
             },
@@ -141,7 +137,7 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit) {
 
 @Composable
 private fun CurrentStarCard(held: StarEntry?) {
-    Card(Modifier.fillMaxWidth().padding(16.dp)) {
+    PixelCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (held != null) {
                 Image(painterResource(held.tier.drawable), contentDescription = null, modifier = Modifier.size(56.dp))
