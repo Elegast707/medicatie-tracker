@@ -75,9 +75,17 @@ object Notifications {
         notify(context, TEST_NOTIFICATION_ID, builder)
     }
 
-    fun showMilestone(context: Context, milestone: Int) {
-        val text = Streaks.message(milestone)
+    fun showMilestone(context: Context, milestone: Int, coins: Int, petName: String) {
+        val text = Streaks.message(milestone) +
+            if (coins > 0) " Je verdiende $coins muntjes voor $petName!" else ""
         val builder = baseBuilder(context, MILESTONE_NOTIFICATION_ID, "🎉 ${Streaks.title(milestone)}", text, ACHIEVEMENT_CHANNEL_ID)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+        notify(context, MILESTONE_NOTIFICATION_ID, builder)
+    }
+
+    fun showCoins(context: Context, coins: Int, petName: String) {
+        val builder = baseBuilder(context, MILESTONE_NOTIFICATION_ID, "⭐ Nieuwe ster!", "Je verdiende $coins muntjes voor $petName!", ACHIEVEMENT_CHANNEL_ID)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
         notify(context, MILESTONE_NOTIFICATION_ID, builder)
