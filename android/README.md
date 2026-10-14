@@ -17,7 +17,7 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
   Geschiedenis zie je je badges, je huidige reeks en je beste reeks ooit.
 - **Sterren**: rechtsboven zie je hoeveel dagen je reeks is. Vanaf 1 dag staat daarnaast een gouden
   vinkje, dat bij 7 dagen een ster wordt: brons vanaf 7 dagen, zilver vanaf
-  30, goud vanaf 90 en blauw vanaf 365. Met een ster kleurt de app goud, zonder ster grijs. Wordt
+  30, goud vanaf 90 en blauw vanaf 365. Met een ster kleurt de app goud, zonder ster in de kleur van het blobje (groen, rood als het honger heeft). Wordt
   een ster vervangen door een hogere of breekt je reeks, dan gaat hij naar je sterrencollectie
   (tik op de ster, of via Beheren).
 - **Blobje**: je eigen virtual pet in 16-bit stijl, met een naam die je zelf kiest. Elke keer dat je
@@ -84,5 +84,10 @@ Zelf bouwen: open de map `android/` in Android Studio, of voer `./gradlew assemb
   (`python3 tools/generate_sprites.py`, vereist Pillow) en staat in `app/src/main/res/drawable-nodpi/`.
   Een plaatje vervangen kan door een PNG met dezelfde naam en afmetingen neer te zetten
   (blobje en accessoires 32×32, eten 16×16, achtergrond 64×48).
-- Lettertype *Press Start 2P* door CodeMan38, onder de SIL Open Font License 1.1
+- De hele app staat in 32-bit pixelstijl: pixelkaders, blokjesbalken en eigen pixelicoontjes.
+  De icoontjes (`ic_px_*`), de sterren en het gouden vinkje zijn vector drawables uit
+  `tools/generate_pixel_icons.py` (`python3 tools/generate_pixel_icons.py`, geen extra pakketten nodig).
+- Koppen in *Press Start 2P* door CodeMan38, onder de SIL Open Font License 1.1
   (`licenses/OFL-PressStart2P.txt`).
+- Gewone tekst in *Pixelify Sans* door Stefie Justprince, onder de SIL Open Font License 1.1
+  (`licenses/OFL-PixelifySans.txt`).
