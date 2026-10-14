@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TrackedItem::class, LogEntry::class, StarEntry::class,
         PetState::class, FoodStock::class, OwnedAccessory::class, FoodReward::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,7 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context, name: String = "medicatie.db"): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(SeedCallback)
                 .build()
 
@@ -64,6 +64,17 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS `food_rewards` (`itemId` INTEGER NOT NULL, `epochDay` INTEGER NOT NULL, " +
                         "`foodId` TEXT NOT NULL, PRIMARY KEY(`itemId`, `epochDay`))",
                 )
+            }
+        }
+
+        /** Versie 5: een aparte blijheidsbalk voor het blobje, en aaien. */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `pet` ADD COLUMN `happiness` INTEGER NOT NULL DEFAULT 80")
+                db.execSQL("ALTER TABLE `pet` ADD COLUMN `happinessAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `pet` ADD COLUMN `pettedAt` INTEGER NOT NULL DEFAULT 0")
+                // De blijheid begint te tellen vanaf de update, niet vanaf 1970.
+                db.execSQL("UPDATE `pet` SET `happinessAt` = ?", arrayOf<Any>(System.currentTimeMillis()))
             }
         }
     }

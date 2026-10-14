@@ -16,15 +16,46 @@ class PetRulesTest {
     private val hour = 3_600_000L
 
     @Test
-    fun hungryAfterADayWithoutFood() {
-        assertEquals(PetMood.BLIJ, PetRules.mood(0, 0))
-        assertEquals(PetMood.BLIJ, PetRules.mood(0, 11 * hour))
-        assertEquals(PetMood.TEVREDEN, PetRules.mood(0, 12 * hour))
-        assertEquals(PetMood.TEVREDEN, PetRules.mood(0, 24 * hour - 1))
-        assertEquals(PetMood.HONGER, PetRules.mood(0, 24 * hour))
-        assertEquals(PetMood.HONGER, PetRules.mood(0, 72 * hour))
+    fun hungerGoesBeforeHappiness() {
+        assertEquals(PetMood.BLIJ, PetRules.mood(0, 80, 0))
+        assertEquals(PetMood.TEVREDEN, PetRules.mood(0, 59, 11 * hour))
+        assertEquals(PetMood.VERDRIETIG, PetRules.mood(0, 29, 23 * hour))
+        assertEquals(PetMood.HONGER, PetRules.mood(0, 100, 24 * hour))
+        assertEquals(PetMood.HONGER, PetRules.mood(0, 0, 72 * hour))
         // Een klok die terugspringt geeft geen honger.
-        assertEquals(PetMood.BLIJ, PetRules.mood(10 * hour, 0))
+        assertEquals(PetMood.BLIJ, PetRules.mood(10 * hour, 100, 0))
+    }
+
+    @Test
+    fun happinessDropsFasterWhenHungry() {
+        // Met een volle buik 1 per uur, na 12 uur 3 per uur, na 24 uur 8 per uur.
+        assertEquals(90, PetRules.happiness(100, 0, 0, 10 * hour))
+        assertEquals(100 - 12 - 3 * 6, PetRules.happiness(100, 0, 0, 18 * hour))
+        assertEquals(100 - 12 - 36 - 8 * 2, PetRules.happiness(100, 0, 0, 26 * hour))
+        assertEquals(0, PetRules.happiness(100, 0, 0, 48 * hour))
+        // Alleen de tijd na het opslaan telt, en terug in de tijd verandert niets.
+        assertEquals(76, PetRules.happiness(80, 20 * hour, 0, 21 * hour + hour / 3))
+        assertEquals(80, PetRules.happiness(80, 20 * hour, 0, 5 * hour))
+    }
+
+    @Test
+    fun pettingHasACooldownAndAHungryCap() {
+        val now = 100 * hour
+        assertEquals(PetRules.PET_BONUS, PetRules.petGain(50, false, 0, now))
+        assertEquals(5, PetRules.petGain(95, false, 0, now))
+        assertEquals(0, PetRules.petGain(50, false, now - 60_000, now))
+        assertEquals(PetRules.PET_BONUS, PetRules.petGain(50, false, now - PetRules.PET_COOLDOWN_MS, now))
+        // Met honger wordt hij door aaien niet blijer dan de helft.
+        assertEquals(PetRules.HUNGRY_HAPPINESS_CAP - 45, PetRules.petGain(45, true, 0, now))
+        assertEquals(0, PetRules.petGain(70, true, 0, now))
+    }
+
+    @Test
+    fun eatingLocksInHappinessBeforeTheNewMeal() {
+        val pet = PetState(lastFedAt = 0, happiness = 100, happinessAt = 0)
+        val fed = pet.withHappiness(30 * hour, PetRules.FEED_BONUS).copy(lastFedAt = 30 * hour)
+        assertEquals(100 - 12 - 36 - 8 * 6 + PetRules.FEED_BONUS, fed.happinessNow(30 * hour))
+        assertEquals(PetMood.VERDRIETIG, fed.mood(30 * hour))
     }
 
     @Test

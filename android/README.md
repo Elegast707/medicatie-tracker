@@ -22,8 +22,12 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
   (tik op de ster, of via Beheren).
 - **Blobje**: je eigen virtual pet in 16-bit stijl, met een naam die je zelf kiest. Elke keer dat je
   iets afvinkt verdien je basiseten (brood, een drankje of een wortel; één keer per item per dag).
-  Heeft je blobje een dag (24 uur) niets gegeten, dan krijgt hij honger: hij wordt rood en
-  verdrietig, ook in het tabblad onderaan. Doodgaan kan niet; voeren maakt hem weer blij. Elke nieuw
+  Het blobje heeft twee balken: **buik** en **blij**. De buik loopt in een dag (24 uur) leeg; dan
+  krijgt hij honger en wordt hij rood, ook in het tabblad onderaan. Blijheid zakt langzaam
+  (1 punt per uur), sneller als zijn buik halfleeg is (3 per uur, na 12 uur) en hard als hij honger
+  heeft (8 per uur). Aai je blobje door erop te tikken of eroverheen te vegen: dat geeft 10 punten,
+  één keer per tien minuten. Met honger kun je hem zo hooguit half blij maken; dan wil hij eerst
+  eten. Eten geeft ook 15 punten blijheid. Doodgaan kan niet. Elke nieuw
   verdiende ster levert muntjes op: brons 10, zilver 25, goud 50, blauw 200. Daarmee koop je in de
   winkel lekker eten (pizza, patat, macaroni, pannenkoek) en accessoires: brillen, zonnebrillen,
   hoeden, sjaaltjes en de gouden pollepel van PKU research. Je start met 20 muntjes.

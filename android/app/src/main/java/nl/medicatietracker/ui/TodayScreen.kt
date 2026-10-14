@@ -14,17 +14,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -134,6 +139,9 @@ fun TodayScreen(app: MedApp) {
     }
 }
 
+/** Felgroen, zodat "Genomen" er in zowel het gouden als het grijze thema uitspringt. */
+private val DoneGreen = Color(0xFF1E8E3E)
+
 @Composable
 private fun TodayItemCard(
     item: TrackedItem,
@@ -171,9 +179,23 @@ private fun TodayItemCard(
             }
             Spacer(Modifier.size(8.dp))
             if (log == null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onLog(LogStatus.GEDAAN) }) { Text(item.type.doneLabel()) }
-                    OutlinedButton(onClick = { onLog(LogStatus.OVERGESLAGEN) }) { Text("Overslaan") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = { onLog(LogStatus.GEDAAN) },
+                        colors = ButtonDefaults.buttonColors(containerColor = DoneGreen, contentColor = Color.White),
+                        modifier = Modifier.weight(1f).height(56.dp),
+                    ) {
+                        Icon(Icons.Filled.Check, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(item.type.doneLabel(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(
+                        onClick = { onLog(LogStatus.OVERGESLAGEN) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text("Overslaan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {

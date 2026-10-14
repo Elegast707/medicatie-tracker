@@ -3,6 +3,8 @@ package nl.medicatietracker.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +39,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -58,6 +61,7 @@ import nl.medicatietracker.data.FeedResult
 import nl.medicatietracker.data.Food
 import nl.medicatietracker.data.PetMood
 import nl.medicatietracker.data.PetRepository
+import nl.medicatietracker.data.PetResult
 import nl.medicatietracker.data.PetRules
 import nl.medicatietracker.data.PetState
 import kotlin.math.floor
@@ -69,6 +73,7 @@ private enum class PetTab(val label: String) { ETEN("Eten"), WINKEL("Winkel"), K
 private val DRAW_ORDER = listOf(AccessorySlot.NEK, AccessorySlot.OGEN, AccessorySlot.HOOFD, AccessorySlot.HAND)
 
 private const val EAT_DURATION_MS = 1600L
+private const val PET_DURATION_MS = 1400L
 
 @Composable
 fun PetScreen(app: MedApp) {
@@ -81,6 +86,7 @@ fun PetScreen(app: MedApp) {
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(PetTab.ETEN) }
     var eating by remember { mutableStateOf<Pair<Food, Long>?>(null) }
+    var pettedAt by remember { mutableStateOf<Long?>(null) }
     var bubble by remember { mutableStateOf<String?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var namePromptDismissed by rememberSaveable { mutableStateOf(false) }
@@ -100,6 +106,17 @@ fun PetScreen(app: MedApp) {
     Box(Modifier.fillMaxSize().background(Px.navy)) {
         val state = pet ?: return@Box
         val mood = state.mood(now)
+        val happiness = state.happinessNow(now)
+        val stroke: () -> Unit = {
+            pettedAt = System.currentTimeMillis()
+            scope.launch {
+                bubble = when (repo.stroke()) {
+                    PetResult.GEAAID -> "Hihi, lekker!"
+                    PetResult.AL_GEAAID -> "Prrr... zo is het genoeg."
+                    PetResult.WIL_ETEN -> "Ik heb honger..."
+                }
+            }
+        }
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -118,7 +135,16 @@ fun PetScreen(app: MedApp) {
             }
 
             Box(Modifier.fillMaxWidth().aspectRatio(64f / 48f)) {
-                PetScene(state, mood, eating, Modifier.fillMaxSize())
+                PetScene(
+                    state,
+                    mood,
+                    eating,
+                    pettedAt,
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) { detectTapGestures { stroke() } }
+                        .pointerInput(Unit) { detectHorizontalDragGestures(onDragEnd = stroke) { change, _ -> change.consume() } },
+                )
                 bubble?.let {
                     PixelPanel(Modifier.align(Alignment.TopCenter).padding(top = 8.dp), contentPadding = 8.dp) {
                         PixelText(it, size = 9.sp)
@@ -129,9 +155,14 @@ fun PetScreen(app: MedApp) {
             PixelPanel(Modifier.fillMaxWidth()) {
                 PixelText("${state.displayName} ${mood.label}.", size = 9.sp)
                 Spacer(Modifier.height(10.dp))
-                HungerBar(PetRules.bellyPercent(state.lastFedAt, now), mood)
+                val hours = PetRules.hoursSinceMeal(state.lastFedAt, now)
+                StatBar("BUIK", PetRules.bellyPercent(state.lastFedAt, now), bellyColor(hours))
+                Spacer(Modifier.height(6.dp))
+                StatBar("BLIJ", happiness, happinessColor(happiness))
                 Spacer(Modifier.height(8.dp))
-                PixelText(lastMealText(PetRules.hoursSinceMeal(state.lastFedAt, now)), size = 8.sp, color = Px.slate)
+                PixelText(lastMealText(hours), size = 8.sp, color = Px.slate)
+                Spacer(Modifier.height(4.dp))
+                PixelText("Tik of aai over ${state.displayName} om hem blij te maken.", size = 8.sp, color = Px.slate)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -190,6 +221,7 @@ fun PetScreen(app: MedApp) {
 private fun moodSprite(mood: PetMood): String = when (mood) {
     PetMood.BLIJ -> "happy"
     PetMood.TEVREDEN -> "neutral"
+    PetMood.VERDRIETIG -> "sad"
     PetMood.HONGER -> "hungry"
 }
 
@@ -204,7 +236,7 @@ private fun blobFrames(): Map<String, List<ImageBitmap>> = mapOf(
 
 /** De kamer met het blobje, getekend op een raster van 64×48 pixels en met hele factoren vergroot. */
 @Composable
-private fun PetScene(pet: PetState, mood: PetMood, eating: Pair<Food, Long>?, modifier: Modifier) {
+private fun PetScene(pet: PetState, mood: PetMood, eating: Pair<Food, Long>?, pettedAt: Long?, modifier: Modifier) {
     val background = ImageBitmap.imageResource(R.drawable.pet_background)
     val heart = ImageBitmap.imageResource(R.drawable.pet_heart)
     val frames = blobFrames()
@@ -233,13 +265,25 @@ private fun PetScene(pet: PetState, mood: PetMood, eating: Pair<Food, Long>?, mo
         draw(background, 0, 0)
         val since = eating?.let { time - it.second } ?: Long.MAX_VALUE
         val isEating = since in 0 until EAT_DURATION_MS
+        val petSince = pettedAt?.let { time - it } ?: Long.MAX_VALUE
+        val isPetted = !isEating && petSince in 0 until PET_DURATION_MS
         val frame = ((time / 500) % 2).toInt()
         val face = when {
             isEating -> if ((time / 200) % 2 == 0L) "eat" else "happy"
+            isPetted -> "happy"
             else -> moodSprite(mood)
         }
-        draw(frames.getValue(face)[frame], 16, 13)
-        accessories.forEach { draw(it, 16, 13 + frame * 2) }
+        // Tijdens het aaien wiebelt hij snel heen en weer.
+        val wiggle = if (isPetted) (if ((time / 120) % 2 == 0L) -1 else 1) else 0
+        draw(frames.getValue(face)[frame], 16 + wiggle, 13)
+        accessories.forEach { draw(it, 16 + wiggle, 13 + frame * 2) }
+
+        if (isPetted) {
+            val rise = (petSince / PET_DURATION_MS.toFloat() * 8).toInt()
+            draw(heart, 28, 10 - rise)
+            if (petSince > 400) draw(heart, 14, 14 - rise)
+            if (petSince > 800) draw(heart, 42, 12 - rise)
+        }
 
         if (isEating) {
             if (since < 700 && foodImage != null) {
@@ -259,17 +303,24 @@ private fun lastMealText(hours: Double): String = when {
     else -> "Laatst gegeten: ${(hours / 24).toInt()} dagen geleden"
 }
 
+private fun bellyColor(hoursSinceMeal: Double): Color = when {
+    hoursSinceMeal >= PetRules.HUNGRY_AFTER_HOURS -> Px.red
+    hoursSinceMeal >= PetRules.CONTENT_AFTER_HOURS -> Px.yellow
+    else -> Px.green
+}
+
+private fun happinessColor(happiness: Int): Color = when {
+    happiness >= PetRules.HAPPY_FROM -> Px.orange
+    happiness >= PetRules.CONTENT_FROM -> Px.yellow
+    else -> Px.plum
+}
+
+/** Een balk van tien blokjes, zoals in een oud spelletje. */
 @Composable
-private fun HungerBar(belly: Int, mood: PetMood) {
-    val filled = (belly + 9) / 10
-    val color = when (mood) {
-        PetMood.BLIJ -> Px.green
-        PetMood.TEVREDEN -> Px.yellow
-        PetMood.HONGER -> Px.red
-    }
+private fun StatBar(label: String, percent: Int, color: Color) {
+    val filled = (percent + 9) / 10
     Row(verticalAlignment = Alignment.CenterVertically) {
-        PixelText("BUIK", size = 8.sp)
-        Spacer(Modifier.width(8.dp))
+        PixelText(label, size = 8.sp, modifier = Modifier.width(40.dp))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             repeat(10) { i ->
                 Box(
