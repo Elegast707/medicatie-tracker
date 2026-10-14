@@ -16,20 +16,23 @@ class PetRulesTest {
     private val hour = 3_600_000L
 
     @Test
-    fun fullnessDecaysAndClamps() {
-        assertEquals(80, PetRules.fullnessAt(80, 0, 0))
-        assertEquals(72, PetRules.fullnessAt(80, 0, 2 * hour))
-        assertEquals(0, PetRules.fullnessAt(80, 0, 48 * hour))
-        // Een klok die terugspringt maakt hem niet voller.
-        assertEquals(80, PetRules.fullnessAt(80, 10 * hour, 0))
+    fun hungryAfterADayWithoutFood() {
+        assertEquals(PetMood.BLIJ, PetRules.mood(0, 0))
+        assertEquals(PetMood.BLIJ, PetRules.mood(0, 11 * hour))
+        assertEquals(PetMood.TEVREDEN, PetRules.mood(0, 12 * hour))
+        assertEquals(PetMood.TEVREDEN, PetRules.mood(0, 24 * hour - 1))
+        assertEquals(PetMood.HONGER, PetRules.mood(0, 24 * hour))
+        assertEquals(PetMood.HONGER, PetRules.mood(0, 72 * hour))
+        // Een klok die terugspringt geeft geen honger.
+        assertEquals(PetMood.BLIJ, PetRules.mood(10 * hour, 0))
     }
 
     @Test
-    fun moodFollowsFullness() {
-        assertEquals(PetMood.BLIJ, PetRules.mood(60))
-        assertEquals(PetMood.TEVREDEN, PetRules.mood(59))
-        assertEquals(PetMood.TEVREDEN, PetRules.mood(30))
-        assertEquals(PetMood.VERDRIETIG, PetRules.mood(29))
+    fun bellyEmptiesOverADay() {
+        assertEquals(100, PetRules.bellyPercent(0, 0))
+        assertEquals(50, PetRules.bellyPercent(0, 12 * hour))
+        assertEquals(0, PetRules.bellyPercent(0, 24 * hour))
+        assertEquals(0, PetRules.bellyPercent(0, 48 * hour))
     }
 
     @Test
@@ -48,7 +51,7 @@ class PetRulesTest {
 
     @Test
     fun equipOnePerSlot() {
-        val pet = PetState(fullnessAt = 0)
+        val pet = PetState(lastFedAt = 0)
             .withEquipped(AccessorySlot.HOOFD, Accessory.PET)
             .withEquipped(AccessorySlot.HOOFD, Accessory.HOGE_HOED)
             .withEquipped(AccessorySlot.HAND, Accessory.GOUDEN_POLLEPEL)

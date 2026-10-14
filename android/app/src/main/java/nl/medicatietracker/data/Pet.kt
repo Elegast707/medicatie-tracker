@@ -1,6 +1,7 @@
 package nl.medicatietracker.data
 
 import androidx.annotation.DrawableRes
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -15,14 +16,14 @@ import nl.medicatietracker.R
 enum class AccessorySlot(val label: String) { HOOFD("Hoofd"), OGEN("Ogen"), NEK("Nek"), HAND("Hand") }
 
 /** Eten voor het blobje. Basiseten verdien je door af te vinken; de rest koop je met muntjes. */
-enum class Food(val label: String, val fullness: Int, val price: Int?, @DrawableRes val drawable: Int) {
-    BROOD("Brood", 25, null, R.drawable.pet_food_brood),
-    DRANKJE("Drankje", 20, null, R.drawable.pet_food_drankje),
-    WORTEL("Wortel", 25, null, R.drawable.pet_food_wortel),
-    PIZZA("Pizza", 45, 6, R.drawable.pet_food_pizza),
-    PATAT("Patat", 40, 5, R.drawable.pet_food_patat),
-    MACARONI("Macaroni", 45, 6, R.drawable.pet_food_macaroni),
-    PANNENKOEK("Pannenkoek", 40, 4, R.drawable.pet_food_pannenkoek),
+enum class Food(val label: String, val price: Int?, @DrawableRes val drawable: Int) {
+    BROOD("Brood", null, R.drawable.pet_food_brood),
+    DRANKJE("Drankje", null, R.drawable.pet_food_drankje),
+    WORTEL("Wortel", null, R.drawable.pet_food_wortel),
+    PIZZA("Pizza", 6, R.drawable.pet_food_pizza),
+    PATAT("Patat", 5, R.drawable.pet_food_patat),
+    MACARONI("Macaroni", 6, R.drawable.pet_food_macaroni),
+    PANNENKOEK("Pannenkoek", 4, R.drawable.pet_food_pannenkoek),
     ;
 
     companion object {
@@ -50,26 +51,30 @@ enum class Accessory(val label: String, val slot: AccessorySlot, val price: Int,
     }
 }
 
-enum class PetMood(val label: String) { BLIJ("is blij"), TEVREDEN("is tevreden"), VERDRIETIG("is verdrietig en heeft honger") }
+enum class PetMood(val label: String) { BLIJ("is blij"), TEVREDEN("is tevreden"), HONGER("heeft honger!") }
 
 object PetRules {
     const val START_COINS = 20
-    const val START_FULLNESS = 70
-    const val MAX_FULLNESS = 100
+    private const val HOUR = 3_600_000L
 
-    /** Hoeveel verzadiging er per uur afgaat: van vol naar leeg in ongeveer een dag. */
-    const val DECAY_PER_HOUR = 4.0
+    /** Na zoveel uur zonder eten krijgt het blobje honger (en wordt hij rood). */
+    const val HUNGRY_AFTER_HOURS = 24
+    const val CONTENT_AFTER_HOURS = 12
 
-    fun fullnessAt(stored: Int, storedAt: Long, now: Long): Int {
-        val hours = (now - storedAt).coerceAtLeast(0) / 3_600_000.0
-        return (stored - hours * DECAY_PER_HOUR).toInt().coerceIn(0, MAX_FULLNESS)
+    fun hoursSinceMeal(lastFedAt: Long, now: Long): Double = (now - lastFedAt).coerceAtLeast(0) / HOUR.toDouble()
+
+    fun mood(lastFedAt: Long, now: Long): PetMood {
+        val hours = hoursSinceMeal(lastFedAt, now)
+        return when {
+            hours >= HUNGRY_AFTER_HOURS -> PetMood.HONGER
+            hours >= CONTENT_AFTER_HOURS -> PetMood.TEVREDEN
+            else -> PetMood.BLIJ
+        }
     }
 
-    fun mood(fullness: Int): PetMood = when {
-        fullness >= 60 -> PetMood.BLIJ
-        fullness >= 30 -> PetMood.TEVREDEN
-        else -> PetMood.VERDRIETIG
-    }
+    /** Hoe vol de buik nog is, van 100 (net gegeten) tot 0 (een dag niets gehad). */
+    fun bellyPercent(lastFedAt: Long, now: Long): Int =
+        (100 - hoursSinceMeal(lastFedAt, now) / HUNGRY_AFTER_HOURS * 100).toInt().coerceIn(0, 100)
 
     /** Muntjes voor een verdiende ster; hoe hoger de ster, hoe meer muntjes. */
     fun coinsForStar(tier: StarTier): Int = when (tier) {
@@ -84,15 +89,17 @@ object PetRules {
 data class PetState(
     @PrimaryKey val id: Int = 1,
     val name: String = "",
-    val fullness: Int = PetRules.START_FULLNESS,
-    val fullnessAt: Long = System.currentTimeMillis(),
+    /** Niet meer gebruikt; blijft bestaan zodat de database niet hoeft te veranderen. */
+    val fullness: Int = 100,
+    /** Moment van de laatste maaltijd (bij een nieuw blobje: het moment van aanmaken). */
+    @ColumnInfo(name = "fullnessAt") val lastFedAt: Long = System.currentTimeMillis(),
     val coins: Int = PetRules.START_COINS,
     val head: String? = null,
     val eyes: String? = null,
     val neck: String? = null,
     val hand: String? = null,
 ) {
-    fun currentFullness(now: Long = System.currentTimeMillis()): Int = PetRules.fullnessAt(fullness, fullnessAt, now)
+    fun mood(now: Long = System.currentTimeMillis()): PetMood = PetRules.mood(lastFedAt, now)
 
     fun equipped(slot: AccessorySlot): Accessory? = Accessory.byId(
         when (slot) {
@@ -157,7 +164,7 @@ interface PetDao {
     suspend fun addFoodReward(reward: FoodReward): Long
 }
 
-enum class FeedResult { GEGETEN, VOL, GEEN_ETEN }
+enum class FeedResult { GEGETEN, GEEN_ETEN }
 
 class PetRepository(private val db: AppDatabase) {
     private val dao = db.petDao()
@@ -190,12 +197,8 @@ class PetRepository(private val db: AppDatabase) {
     suspend fun feed(food: Food): FeedResult = db.withTransaction {
         val stock = dao.food(food.name)?.count ?: 0
         if (stock <= 0) return@withTransaction FeedResult.GEEN_ETEN
-        val now = System.currentTimeMillis()
-        val pet = ensurePet()
-        val current = pet.currentFullness(now)
-        if (current >= PetRules.MAX_FULLNESS) return@withTransaction FeedResult.VOL
         dao.saveFood(FoodStock(food.name, stock - 1))
-        dao.savePet(pet.copy(fullness = (current + food.fullness).coerceAtMost(PetRules.MAX_FULLNESS), fullnessAt = now))
+        dao.savePet(ensurePet().copy(lastFedAt = System.currentTimeMillis()))
         FeedResult.GEGETEN
     }
 

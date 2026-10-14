@@ -99,8 +99,7 @@ fun PetScreen(app: MedApp) {
 
     Box(Modifier.fillMaxSize().background(Px.navy)) {
         val state = pet ?: return@Box
-        val fullness = state.currentFullness(now)
-        val mood = PetRules.mood(fullness)
+        val mood = state.mood(now)
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -130,7 +129,9 @@ fun PetScreen(app: MedApp) {
             PixelPanel(Modifier.fillMaxWidth()) {
                 PixelText("${state.displayName} ${mood.label}.", size = 9.sp)
                 Spacer(Modifier.height(10.dp))
-                HungerBar(fullness)
+                HungerBar(PetRules.bellyPercent(state.lastFedAt, now), mood)
+                Spacer(Modifier.height(8.dp))
+                PixelText(lastMealText(PetRules.hoursSinceMeal(state.lastFedAt, now)), size = 8.sp, color = Px.slate)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -152,7 +153,6 @@ fun PetScreen(app: MedApp) {
                                 eating = item to System.currentTimeMillis()
                                 bubble = "Mmm, ${item.label.lowercase(DUTCH)}!"
                             }
-                            FeedResult.VOL -> bubble = "Ik zit vol!"
                             FeedResult.GEEN_ETEN -> Unit
                         }
                     }
@@ -190,7 +190,7 @@ fun PetScreen(app: MedApp) {
 private fun moodSprite(mood: PetMood): String = when (mood) {
     PetMood.BLIJ -> "happy"
     PetMood.TEVREDEN -> "neutral"
-    PetMood.VERDRIETIG -> "sad"
+    PetMood.HONGER -> "hungry"
 }
 
 @Composable
@@ -198,6 +198,7 @@ private fun blobFrames(): Map<String, List<ImageBitmap>> = mapOf(
     "happy" to listOf(ImageBitmap.imageResource(R.drawable.pet_blob_happy_0), ImageBitmap.imageResource(R.drawable.pet_blob_happy_1)),
     "neutral" to listOf(ImageBitmap.imageResource(R.drawable.pet_blob_neutral_0), ImageBitmap.imageResource(R.drawable.pet_blob_neutral_1)),
     "sad" to listOf(ImageBitmap.imageResource(R.drawable.pet_blob_sad_0), ImageBitmap.imageResource(R.drawable.pet_blob_sad_1)),
+    "hungry" to listOf(ImageBitmap.imageResource(R.drawable.pet_blob_hungry_0), ImageBitmap.imageResource(R.drawable.pet_blob_hungry_1)),
     "eat" to listOf(ImageBitmap.imageResource(R.drawable.pet_blob_eat_0), ImageBitmap.imageResource(R.drawable.pet_blob_eat_1)),
 )
 
@@ -252,13 +253,19 @@ private fun PetScene(pet: PetState, mood: PetMood, eating: Pair<Food, Long>?, mo
     }
 }
 
+private fun lastMealText(hours: Double): String = when {
+    hours < 1 -> "Net gegeten"
+    hours < 48 -> "Laatst gegeten: ${hours.toInt()} uur geleden"
+    else -> "Laatst gegeten: ${(hours / 24).toInt()} dagen geleden"
+}
+
 @Composable
-private fun HungerBar(fullness: Int) {
-    val filled = (fullness + 9) / 10
-    val color = when (PetRules.mood(fullness)) {
+private fun HungerBar(belly: Int, mood: PetMood) {
+    val filled = (belly + 9) / 10
+    val color = when (mood) {
         PetMood.BLIJ -> Px.green
         PetMood.TEVREDEN -> Px.yellow
-        PetMood.VERDRIETIG -> Px.red
+        PetMood.HONGER -> Px.red
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         PixelText("BUIK", size = 8.sp)

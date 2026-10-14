@@ -14,7 +14,11 @@ P = {
  'w':(244,244,244),'s':(148,176,194),'d':(86,108,134),'k':(51,60,87),
 }
 
-def blob(squish=0, mood='happy'):
+# Lichaamskleuren (licht, basis, schaduw): groen normaal, rood bij honger.
+BODY = {'groen': ('l','g','t'), 'rood': ('o','r','p')}
+
+def blob(squish=0, mood='happy', body='groen'):
+    light, base, dark = BODY[body]
     W=H=32
     img=Image.new('RGBA',(W,H),(0,0,0,0))
     px=img.load()
@@ -38,9 +42,9 @@ def blob(squish=0, mood='happy'):
         dx=(x-cx)/rx; dy=(y-cy)/ry
         # licht van linksboven
         shade = dx*0.55 + dy*0.75
-        if shade>0.55: c='t'
-        elif shade<-0.55: c='l'
-        else: c='g'
+        if shade>0.55: c=dark
+        elif shade<-0.55: c=light
+        else: c=base
         px[x,y]=P[c]
     top=min(y for (_,y) in inside)
     # glans
@@ -404,6 +408,9 @@ def export(out):
     for mood in ('happy','neutral','sad','eat'):
         for f,sq in ((0,0),(1,1)):
             img,_=blob(sq,mood); img.save(f'{out}/pet_blob_{mood}_{f}.png')
+    # Honger: rood en verdrietig
+    for f,sq in ((0,0),(1,1)):
+        img,_=blob(sq,'sad','rood'); img.save(f'{out}/pet_blob_hungry_{f}.png')
     for name,(slot,x,y,m) in ACC.items():
         full=Image.new('RGBA',(32,32),(0,0,0,0)); full.alpha_composite(sprite(m),(x,y))
         full.save(f'{out}/pet_acc_{name}.png')

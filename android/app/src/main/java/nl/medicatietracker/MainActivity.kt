@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import nl.medicatietracker.data.History
+import nl.medicatietracker.data.PetMood
 import nl.medicatietracker.data.StarEntry
 import nl.medicatietracker.data.Streaks
 import nl.medicatietracker.ui.HistoryScreen
@@ -145,7 +146,14 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                     NavigationBarItem(
                         selected = selected == TAB_PET,
                         onClick = { selected = TAB_PET },
-                        icon = { PixelImage(R.drawable.pet_blob_happy_0, contentDescription = null, modifier = Modifier.size(28.dp)) },
+                        icon = {
+                            val hungry = pet?.mood() == PetMood.HONGER
+                            PixelImage(
+                                if (hungry) R.drawable.pet_blob_hungry_0 else R.drawable.pet_blob_happy_0,
+                                contentDescription = if (hungry) "$petName heeft honger" else null,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        },
                         label = { Text(petName, maxLines = 1) },
                     )
                 }
