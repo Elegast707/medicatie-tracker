@@ -147,10 +147,17 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                         selected = selected == TAB_PET,
                         onClick = { selected = TAB_PET },
                         icon = {
-                            val hungry = pet?.mood() == PetMood.HONGER
+                            val mood = pet?.mood()
                             PixelImage(
-                                if (hungry) R.drawable.pet_blob_hungry_0 else R.drawable.pet_blob_happy_0,
-                                contentDescription = if (hungry) "$petName heeft honger" else null,
+                                when (mood) {
+                                    PetMood.HONGER -> R.drawable.pet_blob_hungry_0
+                                    PetMood.VERDRIETIG -> R.drawable.pet_blob_sad_0
+                                    else -> R.drawable.pet_blob_happy_0
+                                },
+                                contentDescription = when (mood) {
+                                    PetMood.HONGER, PetMood.VERDRIETIG -> "$petName ${mood?.label}"
+                                    else -> null
+                                },
                                 modifier = Modifier.size(28.dp),
                             )
                         },

@@ -12,6 +12,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import nl.medicatietracker.R
+import kotlin.math.roundToInt
 
 enum class AccessorySlot(val label: String) { HOOFD("Hoofd"), OGEN("Ogen"), NEK("Nek"), HAND("Hand") }
 
@@ -51,7 +52,15 @@ enum class Accessory(val label: String, val slot: AccessorySlot, val price: Int,
     }
 }
 
-enum class PetMood(val label: String) { BLIJ("is blij"), TEVREDEN("is tevreden"), HONGER("heeft honger!") }
+enum class PetMood(val label: String) {
+    BLIJ("is blij"),
+    TEVREDEN("is tevreden"),
+    VERDRIETIG("is verdrietig"),
+    HONGER("heeft honger!"),
+}
+
+/** Wat er gebeurt als je het blobje aait. */
+enum class PetResult { GEAAID, WIL_ETEN }
 
 object PetRules {
     const val START_COINS = 20
@@ -63,13 +72,53 @@ object PetRules {
 
     fun hoursSinceMeal(lastFedAt: Long, now: Long): Double = (now - lastFedAt).coerceAtLeast(0) / HOUR.toDouble()
 
-    fun mood(lastFedAt: Long, now: Long): PetMood {
-        val hours = hoursSinceMeal(lastFedAt, now)
-        return when {
-            hours >= HUNGRY_AFTER_HOURS -> PetMood.HONGER
-            hours >= CONTENT_AFTER_HOURS -> PetMood.TEVREDEN
-            else -> PetMood.BLIJ
-        }
+    fun isHungry(lastFedAt: Long, now: Long): Boolean = hoursSinceMeal(lastFedAt, now) >= HUNGRY_AFTER_HOURS
+
+    /** Honger gaat voor; verder bepaalt de blijheidsbalk hoe het blobje zich voelt. */
+    fun mood(lastFedAt: Long, happiness: Int, now: Long): PetMood = when {
+        isHungry(lastFedAt, now) -> PetMood.HONGER
+        happiness >= HAPPY_FROM -> PetMood.BLIJ
+        happiness >= CONTENT_FROM -> PetMood.TEVREDEN
+        else -> PetMood.VERDRIETIG
+    }
+
+    /** Moet gelijk blijven aan de standaardwaarde van [PetState.happiness] in de database. */
+    const val START_HAPPINESS = 80
+    const val HAPPY_FROM = 60
+    const val CONTENT_FROM = 30
+
+    /** Blijheid die er per uur af gaat: van vol naar leeg in 24 uur, en twee keer zo snel met honger. */
+    const val DECAY_FED = 100.0 / 24
+    const val DECAY_HUNGRY = 2 * DECAY_FED
+
+    /** Aaien kan altijd en geeft elke keer blijheid. */
+    const val PET_BONUS = 10
+
+    /** Met honger kun je hem door aaien niet blijer maken dan dit; dan wil hij eerst eten. */
+    const val HUNGRY_HAPPINESS_CAP = 50
+
+    /** Eten maakt ook een beetje blij. */
+    const val FEED_BONUS = 15
+
+    /**
+     * Hoeveel blijheid er tussen [from] en [to] af gaat: [DECAY_FED] per uur, en [DECAY_HUNGRY] per uur
+     * zodra hij honger heeft (vanaf [HUNGRY_AFTER_HOURS] na de laatste maaltijd).
+     */
+    fun happinessLoss(lastFedAt: Long, from: Long, to: Long): Double {
+        if (to <= from) return 0.0
+        val hungry = lastFedAt + HUNGRY_AFTER_HOURS * HOUR
+        val hungryMs = (to - maxOf(hungry, from)).coerceAtLeast(0)
+        return ((to - from - hungryMs) * DECAY_FED + hungryMs * DECAY_HUNGRY) / HOUR
+    }
+
+    /** De blijheid op [now], uitgaande van [stored] op moment [storedAt]. Van 0 tot 100. */
+    fun happiness(stored: Int, storedAt: Long, lastFedAt: Long, now: Long): Int =
+        (stored - happinessLoss(lastFedAt, storedAt, now)).roundToInt().coerceIn(0, 100)
+
+    /** Hoeveel blijheid aaien nu oplevert; 0 als hij honger heeft en al zo blij is als hij met honger kan worden. */
+    fun petGain(happiness: Int, hungry: Boolean): Int {
+        val cap = if (hungry) HUNGRY_HAPPINESS_CAP else 100
+        return (minOf(happiness + PET_BONUS, cap) - happiness).coerceAtLeast(0)
     }
 
     /** Hoe vol de buik nog is, van 100 (net gegeten) tot 0 (een dag niets gehad). */
@@ -98,8 +147,18 @@ data class PetState(
     val eyes: String? = null,
     val neck: String? = null,
     val hand: String? = null,
+    /** Blijheid (0-100) zoals die was op [happinessAt]; daarna zakt hij met de tijd, zie [PetRules.happiness]. */
+    @ColumnInfo(defaultValue = "80") val happiness: Int = PetRules.START_HAPPINESS,
+    @ColumnInfo(defaultValue = "0") val happinessAt: Long = lastFedAt,
 ) {
-    fun mood(now: Long = System.currentTimeMillis()): PetMood = PetRules.mood(lastFedAt, now)
+    fun happinessNow(now: Long = System.currentTimeMillis()): Int =
+        PetRules.happiness(happiness, happinessAt, lastFedAt, now)
+
+    fun mood(now: Long = System.currentTimeMillis()): PetMood = PetRules.mood(lastFedAt, happinessNow(now), now)
+
+    /** Zet de blijheid van nu vast (plus [bonus]), zodat een nieuwe maaltijd niet met terugwerkende kracht telt. */
+    fun withHappiness(now: Long, bonus: Int = 0): PetState =
+        copy(happiness = (happinessNow(now) + bonus).coerceIn(0, 100), happinessAt = now)
 
     fun equipped(slot: AccessorySlot): Accessory? = Accessory.byId(
         when (slot) {
@@ -198,8 +257,21 @@ class PetRepository(private val db: AppDatabase) {
         val stock = dao.food(food.name)?.count ?: 0
         if (stock <= 0) return@withTransaction FeedResult.GEEN_ETEN
         dao.saveFood(FoodStock(food.name, stock - 1))
-        dao.savePet(ensurePet().copy(lastFedAt = System.currentTimeMillis()))
+        val now = System.currentTimeMillis()
+        dao.savePet(ensurePet().withHappiness(now, PetRules.FEED_BONUS).copy(lastFedAt = now))
         FeedResult.GEGETEN
+    }
+
+    /** Aait het blobje; dat maakt hem blijer. */
+    suspend fun stroke(): PetResult = db.withTransaction {
+        val now = System.currentTimeMillis()
+        val pet = ensurePet()
+        val happiness = pet.happinessNow(now)
+        val hungry = PetRules.isHungry(pet.lastFedAt, now)
+        val gain = PetRules.petGain(happiness, hungry)
+        if (hungry && gain == 0) return@withTransaction PetResult.WIL_ETEN
+        dao.savePet(pet.withHappiness(now, gain))
+        PetResult.GEAAID
     }
 
     suspend fun buyFood(food: Food): Boolean = db.withTransaction {
