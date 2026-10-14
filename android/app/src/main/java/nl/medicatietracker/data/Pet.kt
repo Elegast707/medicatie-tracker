@@ -73,10 +73,10 @@ object PetRules {
 
     /** Muntjes voor een verdiende ster; hoe hoger de ster, hoe meer muntjes. */
     fun coinsForStar(tier: StarTier): Int = when (tier) {
-        StarTier.BRONS -> 25
-        StarTier.ZILVER -> 75
-        StarTier.GOUD -> 200
-        StarTier.BLAUW -> 1000
+        StarTier.BRONS -> 10
+        StarTier.ZILVER -> 25
+        StarTier.GOUD -> 50
+        StarTier.BLAUW -> 200
     }
 }
 

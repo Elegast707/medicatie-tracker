@@ -37,7 +37,7 @@ class PetRulesTest {
         val coins = StarTier.entries.map { PetRules.coinsForStar(it) }
         assertTrue(coins.all { it > 0 })
         assertEquals(coins.sorted(), coins)
-        assertEquals(coins.distinct(), coins)
+        assertEquals(listOf(10, 25, 50, 200), coins)
     }
 
     @Test
