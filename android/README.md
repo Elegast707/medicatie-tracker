@@ -5,7 +5,7 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
 ## Wat de app doet
 
 - **Vandaag**: alle medicatie en taken van vandaag, op tijd gesorteerd. Tik op *Genomen/Gedaan* of
-  *Overslaan*. Te late items worden rood. Een vergissing herstel je met *Ongedaan maken*.
+  *Overslaan*. Afgevinkt? Dan springt er een groen vinkje tevoorschijn. Te late items worden rood. Een vergissing herstel je met *Ongedaan maken*.
 - **Meldingen**: op het ingestelde tijdstip krijg je een melding met de knoppen *Genomen/Gedaan* en
   *Overslaan*. Vink je niets af, dan komt de melding elke X minuten terug (per item instelbaar), tot
   middernacht. Herinneringen blijven werken na een herstart van de telefoon.
@@ -23,11 +23,10 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
 - **Blobje**: je eigen virtual pet in 16-bit stijl, met een naam die je zelf kiest. Elke keer dat je
   iets afvinkt verdien je basiseten (brood, een drankje of een wortel; één keer per item per dag).
   Het blobje heeft twee balken: **buik** en **blij**. De buik loopt in een dag (24 uur) leeg; dan
-  krijgt hij honger en wordt hij rood, ook in het tabblad onderaan. Blijheid zakt langzaam
-  (1 punt per uur), sneller als zijn buik halfleeg is (3 per uur, na 12 uur) en hard als hij honger
-  heeft (8 per uur). Aai je blobje door erop te tikken of eroverheen te vegen: dat geeft 10 punten,
-  één keer per tien minuten. Met honger kun je hem zo hooguit half blij maken; dan wil hij eerst
-  eten. Eten geeft ook 15 punten blijheid. Doodgaan kan niet. Elke nieuw
+  krijgt hij honger en wordt hij rood, ook in het tabblad onderaan. Ook de blijheid loopt in 24 uur
+  van vol naar leeg, en twee keer zo snel als hij honger heeft. Aai je blobje door erop te tikken of
+  eroverheen te vegen: dat kan altijd en geeft elke keer 10 punten. Met honger kun je hem zo
+  hooguit half blij maken; dan wil hij eerst eten. Eten geeft ook 15 punten blijheid. Doodgaan kan niet. Elke nieuw
   verdiende ster levert muntjes op: brons 10, zilver 25, goud 50, blauw 200. Daarmee koop je in de
   winkel lekker eten (pizza, patat, macaroni, pannenkoek) en accessoires: brillen, zonnebrillen,
   hoeden, sjaaltjes en de gouden pollepel van PKU research. Je start met 20 muntjes.

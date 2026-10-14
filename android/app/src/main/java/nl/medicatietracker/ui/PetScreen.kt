@@ -112,7 +112,6 @@ fun PetScreen(app: MedApp) {
             scope.launch {
                 bubble = when (repo.stroke()) {
                     PetResult.GEAAID -> "Hihi, lekker!"
-                    PetResult.AL_GEAAID -> "Prrr... zo is het genoeg."
                     PetResult.WIL_ETEN -> "Ik heb honger..."
                 }
             }

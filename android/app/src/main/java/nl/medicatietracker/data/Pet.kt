@@ -60,7 +60,7 @@ enum class PetMood(val label: String) {
 }
 
 /** Wat er gebeurt als je het blobje aait. */
-enum class PetResult { GEAAID, AL_GEAAID, WIL_ETEN }
+enum class PetResult { GEAAID, WIL_ETEN }
 
 object PetRules {
     const val START_COINS = 20
@@ -87,14 +87,12 @@ object PetRules {
     const val HAPPY_FROM = 60
     const val CONTENT_FROM = 30
 
-    /** Blijheid die er per uur af gaat: langzaam met een volle buik, snel met honger. */
-    const val DECAY_FED = 1.0
-    const val DECAY_PECKISH = 3.0
-    const val DECAY_HUNGRY = 8.0
+    /** Blijheid die er per uur af gaat: van vol naar leeg in 24 uur, en twee keer zo snel met honger. */
+    const val DECAY_FED = 100.0 / 24
+    const val DECAY_HUNGRY = 2 * DECAY_FED
 
-    /** Aaien geeft blijheid, maar maar één keer per [PET_COOLDOWN_MS]. */
+    /** Aaien kan altijd en geeft elke keer blijheid. */
     const val PET_BONUS = 10
-    const val PET_COOLDOWN_MS = 10 * 60_000L
 
     /** Met honger kun je hem door aaien niet blijer maken dan dit; dan wil hij eerst eten. */
     const val HUNGRY_HAPPINESS_CAP = 50
@@ -103,28 +101,22 @@ object PetRules {
     const val FEED_BONUS = 15
 
     /**
-     * Hoeveel blijheid er tussen [from] en [to] af gaat. Hoe langer geleden de laatste maaltijd,
-     * hoe sneller het gaat: tot 12 uur [DECAY_FED], tot 24 uur [DECAY_PECKISH], daarna [DECAY_HUNGRY].
+     * Hoeveel blijheid er tussen [from] en [to] af gaat: [DECAY_FED] per uur, en [DECAY_HUNGRY] per uur
+     * zodra hij honger heeft (vanaf [HUNGRY_AFTER_HOURS] na de laatste maaltijd).
      */
     fun happinessLoss(lastFedAt: Long, from: Long, to: Long): Double {
         if (to <= from) return 0.0
-        val peckish = lastFedAt + CONTENT_AFTER_HOURS * HOUR
         val hungry = lastFedAt + HUNGRY_AFTER_HOURS * HOUR
-        fun overlap(start: Long, end: Long): Long = (minOf(end, to) - maxOf(start, from)).coerceAtLeast(0)
-        return (
-            overlap(Long.MIN_VALUE, peckish) * DECAY_FED +
-                overlap(peckish, hungry) * DECAY_PECKISH +
-                overlap(hungry, Long.MAX_VALUE) * DECAY_HUNGRY
-            ) / HOUR
+        val hungryMs = (to - maxOf(hungry, from)).coerceAtLeast(0)
+        return ((to - from - hungryMs) * DECAY_FED + hungryMs * DECAY_HUNGRY) / HOUR
     }
 
     /** De blijheid op [now], uitgaande van [stored] op moment [storedAt]. Van 0 tot 100. */
     fun happiness(stored: Int, storedAt: Long, lastFedAt: Long, now: Long): Int =
         (stored - happinessLoss(lastFedAt, storedAt, now)).roundToInt().coerceIn(0, 100)
 
-    /** Hoeveel blijheid aaien nu oplevert; 0 als hij net al geaaid is of honger heeft en al op het maximum zit. */
-    fun petGain(happiness: Int, hungry: Boolean, lastPettedAt: Long, now: Long): Int {
-        if (now - lastPettedAt in 0 until PET_COOLDOWN_MS) return 0
+    /** Hoeveel blijheid aaien nu oplevert; 0 als hij honger heeft en al zo blij is als hij met honger kan worden. */
+    fun petGain(happiness: Int, hungry: Boolean): Int {
         val cap = if (hungry) HUNGRY_HAPPINESS_CAP else 100
         return (minOf(happiness + PET_BONUS, cap) - happiness).coerceAtLeast(0)
     }
@@ -158,8 +150,6 @@ data class PetState(
     /** Blijheid (0-100) zoals die was op [happinessAt]; daarna zakt hij met de tijd, zie [PetRules.happiness]. */
     @ColumnInfo(defaultValue = "80") val happiness: Int = PetRules.START_HAPPINESS,
     @ColumnInfo(defaultValue = "0") val happinessAt: Long = lastFedAt,
-    /** Laatste keer dat het blobje blijheid kreeg van aaien. */
-    @ColumnInfo(defaultValue = "0") val pettedAt: Long = 0,
 ) {
     fun happinessNow(now: Long = System.currentTimeMillis()): Int =
         PetRules.happiness(happiness, happinessAt, lastFedAt, now)
@@ -272,16 +262,15 @@ class PetRepository(private val db: AppDatabase) {
         FeedResult.GEGETEN
     }
 
-    /** Aait het blobje. Dat maakt hem blijer, maar niet vaker dan eens per tien minuten. */
+    /** Aait het blobje; dat maakt hem blijer. */
     suspend fun stroke(): PetResult = db.withTransaction {
         val now = System.currentTimeMillis()
         val pet = ensurePet()
         val happiness = pet.happinessNow(now)
         val hungry = PetRules.isHungry(pet.lastFedAt, now)
-        if (now - pet.pettedAt in 0 until PetRules.PET_COOLDOWN_MS) return@withTransaction PetResult.AL_GEAAID
-        val gain = PetRules.petGain(happiness, hungry, pet.pettedAt, now)
+        val gain = PetRules.petGain(happiness, hungry)
         if (hungry && gain == 0) return@withTransaction PetResult.WIL_ETEN
-        dao.savePet(pet.withHappiness(now, gain).copy(pettedAt = now))
+        dao.savePet(pet.withHappiness(now, gain))
         PetResult.GEAAID
     }
 

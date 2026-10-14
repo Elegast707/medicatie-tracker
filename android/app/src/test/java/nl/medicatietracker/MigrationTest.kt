@@ -73,7 +73,7 @@ class MigrationTest {
         val db = AppDatabase.build(context, name)
         val sql = db.openHelper.writableDatabase
         assertEquals(5, sql.version)
-        sql.query("SELECT name, coins, head, fullnessAt, happiness, happinessAt, pettedAt FROM pet").use {
+        sql.query("SELECT name, coins, head, fullnessAt, happiness, happinessAt FROM pet").use {
             it.moveToFirst()
             assertEquals("Bolle", it.getString(0))
             assertEquals(123, it.getInt(1))
@@ -81,7 +81,6 @@ class MigrationTest {
             assertEquals(1000L, it.getLong(3))
             assertEquals(80, it.getInt(4))
             assertTrue(it.getLong(5) >= before)
-            assertEquals(0L, it.getLong(6))
         }
         db.close()
     }

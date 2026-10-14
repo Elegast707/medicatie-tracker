@@ -8,7 +8,13 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
@@ -32,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -142,6 +151,32 @@ fun TodayScreen(app: MedApp) {
 /** Felgroen, zodat "Genomen" er in zowel het gouden als het grijze thema uitspringt. */
 private val DoneGreen = Color(0xFF1E8E3E)
 
+/** Groen rondje met een wit vinkje. Net afgevinkt? Dan springt het met een veerkrachtige animatie tevoorschijn. */
+@Composable
+private fun DoneCheck(log: LogEntry) {
+    val fresh = remember(log.id) { System.currentTimeMillis() - log.loggedAt < 3_000 }
+    val pop = remember(log.id) { Animatable(if (fresh) 0f else 1f) }
+    val turn = remember(log.id) { Animatable(if (fresh) -90f else 0f) }
+    LaunchedEffect(log.id) {
+        if (!fresh) return@LaunchedEffect
+        launch { turn.animateTo(0f, tween(400)) }
+        pop.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow))
+    }
+    Box(
+        Modifier
+            .size(36.dp)
+            .graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+                rotationZ = turn.value
+            }
+            .background(DoneGreen, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.Check, contentDescription = "Gedaan", tint = Color.White, modifier = Modifier.size(24.dp))
+    }
+}
+
 @Composable
 private fun TodayItemCard(
     item: TrackedItem,
@@ -174,7 +209,11 @@ private fun TodayItemCard(
                     }
                 }
                 if (log != null) {
-                    StatusIcon(if (log.status == LogStatus.GEDAAN) RowStatus.GEDAAN else RowStatus.OVERGESLAGEN)
+                    if (log.status == LogStatus.GEDAAN) {
+                        DoneCheck(log)
+                    } else {
+                        StatusIcon(RowStatus.OVERGESLAGEN)
+                    }
                 }
             }
             Spacer(Modifier.size(8.dp))

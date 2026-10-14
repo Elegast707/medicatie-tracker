@@ -72,7 +72,6 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `pet` ADD COLUMN `happiness` INTEGER NOT NULL DEFAULT 80")
                 db.execSQL("ALTER TABLE `pet` ADD COLUMN `happinessAt` INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE `pet` ADD COLUMN `pettedAt` INTEGER NOT NULL DEFAULT 0")
                 // De blijheid begint te tellen vanaf de update, niet vanaf 1970.
                 db.execSQL("UPDATE `pet` SET `happinessAt` = ?", arrayOf<Any>(System.currentTimeMillis()))
             }
