@@ -233,17 +233,23 @@ fun PixelProgressBar(
     }
 }
 
-/** Selectiekader om het icoontje van het actieve tabblad, in plaats van het ronde Material-bolletje. */
+/**
+ * Vierkante pixelknop om het icoontje van een tabblad. Elk tabblad heeft er een; het actieve tabblad is
+ * ingedrukt (schaduw linksboven, icoontje een pixel lager) en in de themakleur.
+ */
 @Composable
-fun PixelSelection(selected: Boolean, content: @Composable () -> Unit) {
-    val fill = MaterialTheme.colorScheme.primaryContainer
+fun PixelTabButton(selected: Boolean, content: @Composable () -> Unit) {
+    val fill = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest
     val edge = pixelEdge()
     val light = lerp(fill, Color.White, 0.45f)
     val shade = lerp(fill, edge, 0.25f)
     Box(
         Modifier
-            .then(if (selected) Modifier.drawBehind { pixelFrame(fill, light, shade, 2.dp.toPx(), edge) } else Modifier)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .drawBehind {
+                val u = 2.dp.toPx()
+                if (selected) pixelFrame(fill, shade, light, u, edge) else pixelFrame(fill, light, shade, u, edge)
+            }
+            .padding(start = 16.dp, end = 16.dp, top = if (selected) 7.dp else 5.dp, bottom = if (selected) 5.dp else 7.dp),
         contentAlignment = Alignment.Center,
     ) { content() }
 }

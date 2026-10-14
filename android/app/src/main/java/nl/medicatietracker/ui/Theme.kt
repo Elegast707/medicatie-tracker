@@ -27,7 +27,7 @@ import kotlinx.coroutines.delay
 import nl.medicatietracker.data.RowStatus
 import java.time.LocalDateTime
 
-// Goud zolang er een ster rechtsboven staat, anders grijs.
+// Goud zolang er een ster rechtsboven staat, anders de kleur van het blobje.
 private val GoldLight = lightColorScheme(
     primary = Color(0xFF8A6100),
     onPrimary = Color.White,
@@ -64,41 +64,81 @@ private val GoldDark = darkColorScheme(
     surfaceContainerHighest = Color(0xFF3B3428),
 )
 
-private val GreyLight = lightColorScheme(
-    primary = Color(0xFF5F6368),
+// Zonder ster: de kleuren van het blobje (Sweetie 16), groen en rood als het honger heeft.
+private val PetGreenLight = lightColorScheme(
+    primary = Color(0xFF1F7A45),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE1E3E6),
-    onPrimaryContainer = Color(0xFF1F2124),
-    secondaryContainer = Color(0xFFE3E3E3),
-    onSecondaryContainer = Color(0xFF1F1F1F),
-    tertiaryContainer = Color(0xFFE6E6E6),
-    onTertiaryContainer = Color(0xFF1F1F1F),
-    background = Color(0xFFF7F7F7),
-    surface = Color(0xFFF7F7F7),
-    surfaceVariant = Color(0xFFE2E2E2),
-    surfaceContainerLow = Color(0xFFF2F2F2),
-    surfaceContainer = Color(0xFFEDEDED),
-    surfaceContainerHigh = Color(0xFFE8E8E8),
-    surfaceContainerHighest = Color(0xFFE2E2E2),
+    primaryContainer = Color(0xFFC9F2A8),
+    onPrimaryContainer = Color(0xFF0B2E12),
+    secondaryContainer = Color(0xFFD4EFC4),
+    onSecondaryContainer = Color(0xFF0F2A14),
+    tertiaryContainer = Color(0xFFDDF5C0),
+    onTertiaryContainer = Color(0xFF0B2E12),
+    background = Color(0xFFF3FBEA),
+    surface = Color(0xFFF3FBEA),
+    surfaceVariant = Color(0xFFDCEBD0),
+    surfaceContainerLow = Color(0xFFEEF8E3),
+    surfaceContainer = Color(0xFFE8F3DC),
+    surfaceContainerHigh = Color(0xFFE2EED6),
+    surfaceContainerHighest = Color(0xFFDCEBD0),
 )
 
-private val GreyDark = darkColorScheme(
-    primary = Color(0xFFC4C7CB),
-    onPrimary = Color(0xFF2E3134),
-    primaryContainer = Color(0xFF45484C),
-    onPrimaryContainer = Color(0xFFE1E3E6),
-    secondaryContainer = Color(0xFF444444),
-    onSecondaryContainer = Color(0xFFE3E3E3),
-    tertiaryContainer = Color(0xFF444444),
-    onTertiaryContainer = Color(0xFFE3E3E3),
-    background = Color(0xFF141414),
-    surface = Color(0xFF141414),
-    surfaceVariant = Color(0xFF444444),
-    surfaceContainerLow = Color(0xFF1C1C1C),
-    surfaceContainer = Color(0xFF202020),
-    surfaceContainerHigh = Color(0xFF2A2A2A),
-    surfaceContainerHighest = Color(0xFF353535),
+private val PetGreenDark = darkColorScheme(
+    primary = Color(0xFFA7F070),
+    onPrimary = Color(0xFF0B2E12),
+    primaryContainer = Color(0xFF1F5A30),
+    onPrimaryContainer = Color(0xFFC9F2A8),
+    secondaryContainer = Color(0xFF2C4A30),
+    onSecondaryContainer = Color(0xFFD4EFC4),
+    tertiaryContainer = Color(0xFF1F5A30),
+    onTertiaryContainer = Color(0xFFC9F2A8),
+    background = Color(0xFF0E1A10),
+    surface = Color(0xFF0E1A10),
+    surfaceVariant = Color(0xFF34483A),
+    surfaceContainerLow = Color(0xFF142317),
+    surfaceContainer = Color(0xFF182A1B),
+    surfaceContainerHigh = Color(0xFF213525),
+    surfaceContainerHighest = Color(0xFF2B402F),
 )
+
+private val PetRedLight = lightColorScheme(
+    primary = Color(0xFFA3354A),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFD3C4),
+    onPrimaryContainer = Color(0xFF3A0D18),
+    secondaryContainer = Color(0xFFF7D9D2),
+    onSecondaryContainer = Color(0xFF3A1218),
+    tertiaryContainer = Color(0xFFFFE0D2),
+    onTertiaryContainer = Color(0xFF3A0D18),
+    background = Color(0xFFFFF3EF),
+    surface = Color(0xFFFFF3EF),
+    surfaceVariant = Color(0xFFF0DAD4),
+    surfaceContainerLow = Color(0xFFFCEEE9),
+    surfaceContainer = Color(0xFFF8E6E0),
+    surfaceContainerHigh = Color(0xFFF4E0DA),
+    surfaceContainerHighest = Color(0xFFF0DAD4),
+)
+
+private val PetRedDark = darkColorScheme(
+    primary = Color(0xFFFF9C7E),
+    onPrimary = Color(0xFF4A1020),
+    primaryContainer = Color(0xFF6E2236),
+    onPrimaryContainer = Color(0xFFFFD3C4),
+    secondaryContainer = Color(0xFF553036),
+    onSecondaryContainer = Color(0xFFF7D9D2),
+    tertiaryContainer = Color(0xFF6E2236),
+    onTertiaryContainer = Color(0xFFFFD3C4),
+    background = Color(0xFF1C0F12),
+    surface = Color(0xFF1C0F12),
+    surfaceVariant = Color(0xFF4D3A3C),
+    surfaceContainerLow = Color(0xFF241418),
+    surfaceContainer = Color(0xFF2A181C),
+    surfaceContainerHigh = Color(0xFF352226),
+    surfaceContainerHighest = Color(0xFF402C30),
+)
+
+/** Kleur van de app: goud met een ster, anders de kleur van het blobje. */
+enum class AppTint { GOUD, PET_GROEN, PET_ROOD }
 
 /**
  * 32-bit pixelstijl: koppen in Press Start 2P, gewone tekst in Pixelify Sans. Pixelfonts lezen kleiner
@@ -139,14 +179,13 @@ private val PixelShapes = Shapes(
 private val PixelType = pixelTypography()
 
 @Composable
-fun MedTheme(gold: Boolean, content: @Composable () -> Unit) {
+fun MedTheme(tint: AppTint, content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     MaterialTheme(
-        colorScheme = when {
-            gold && dark -> GoldDark
-            gold -> GoldLight
-            dark -> GreyDark
-            else -> GreyLight
+        colorScheme = when (tint) {
+            AppTint.GOUD -> if (dark) GoldDark else GoldLight
+            AppTint.PET_GROEN -> if (dark) PetGreenDark else PetGreenLight
+            AppTint.PET_ROOD -> if (dark) PetRedDark else PetRedLight
         },
         typography = PixelType,
         shapes = PixelShapes,

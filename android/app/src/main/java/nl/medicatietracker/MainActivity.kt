@@ -51,10 +51,11 @@ import nl.medicatietracker.data.StarEntry
 import nl.medicatietracker.data.Streaks
 import nl.medicatietracker.ui.HistoryScreen
 import nl.medicatietracker.ui.ManageScreen
+import nl.medicatietracker.ui.AppTint
 import nl.medicatietracker.ui.MedTheme
 import nl.medicatietracker.ui.PetScreen
 import nl.medicatietracker.ui.PixelImage
-import nl.medicatietracker.ui.PixelSelection
+import nl.medicatietracker.ui.PixelTabButton
 import nl.medicatietracker.ui.pixelEdge
 import nl.medicatietracker.ui.StreakBadge
 import nl.medicatietracker.ui.StarCollectionDialog
@@ -68,7 +69,17 @@ class MainActivity : ComponentActivity() {
         val app = application as MedApp
         setContent {
             val star by app.repository.heldStar.collectAsStateWithLifecycle(null)
-            MedTheme(gold = star != null) {
+            val pet by app.petRepository.pet.collectAsStateWithLifecycle(null)
+            val now by rememberNow()
+            // Zonder ster volgt de app de kleur van het blobje: groen, of rood als het honger heeft.
+            val hungry = remember(pet, now) { pet?.mood() == PetMood.HONGER }
+            MedTheme(
+                when {
+                    star != null -> AppTint.GOUD
+                    hungry -> AppTint.PET_ROOD
+                    else -> AppTint.PET_GROEN
+                },
+            ) {
                 AppRoot(app, star)
             }
         }
@@ -167,7 +178,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                         colors = navColors,
                         icon = {
                             val mood = pet?.mood()
-                            PixelSelection(selected == TAB_PET) {
+                            PixelTabButton(selected == TAB_PET) {
                                 PixelImage(
                                     when (mood) {
                                         PetMood.HONGER -> R.drawable.pet_blob_hungry_0
@@ -204,7 +215,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
 
 @Composable
 private fun NavIcon(selected: Boolean, @DrawableRes icon: Int) {
-    PixelSelection(selected) {
+    PixelTabButton(selected) {
         Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp))
     }
 }
