@@ -33,16 +33,16 @@ enum class Food(val label: String, val price: Int?, @DrawableRes val drawable: I
 }
 
 enum class Accessory(val label: String, val slot: AccessorySlot, val price: Int, @DrawableRes val drawable: Int) {
-    PET("Pet", AccessorySlot.HOOFD, 15, R.drawable.pet_acc_pet),
-    MUTS("Muts", AccessorySlot.HOOFD, 15, R.drawable.pet_acc_muts),
-    FEESTMUTS("Feestmuts", AccessorySlot.HOOFD, 20, R.drawable.pet_acc_feestmuts),
-    HOGE_HOED("Hoge hoed", AccessorySlot.HOOFD, 30, R.drawable.pet_acc_hoge_hoed),
-    RONDE_BRIL("Ronde bril", AccessorySlot.OGEN, 15, R.drawable.pet_acc_ronde_bril),
-    NERDBRIL("Nerdbril", AccessorySlot.OGEN, 20, R.drawable.pet_acc_nerdbril),
-    ZONNEBRIL("Zonnebril", AccessorySlot.OGEN, 25, R.drawable.pet_acc_zonnebril),
-    HARTJESBRIL("Hartjesbril", AccessorySlot.OGEN, 35, R.drawable.pet_acc_hartjesbril),
-    RODE_SJAAL("Rode sjaal", AccessorySlot.NEK, 15, R.drawable.pet_acc_rode_sjaal),
-    STREEPJESSJAAL("Streepjessjaal", AccessorySlot.NEK, 20, R.drawable.pet_acc_streepjessjaal),
+    PET("Pet", AccessorySlot.HOOFD, 5, R.drawable.pet_acc_pet),
+    MUTS("Muts", AccessorySlot.HOOFD, 5, R.drawable.pet_acc_muts),
+    FEESTMUTS("Feestmuts", AccessorySlot.HOOFD, 10, R.drawable.pet_acc_feestmuts),
+    HOGE_HOED("Hoge hoed", AccessorySlot.HOOFD, 20, R.drawable.pet_acc_hoge_hoed),
+    RONDE_BRIL("Ronde bril", AccessorySlot.OGEN, 5, R.drawable.pet_acc_ronde_bril),
+    NERDBRIL("Nerdbril", AccessorySlot.OGEN, 10, R.drawable.pet_acc_nerdbril),
+    ZONNEBRIL("Zonnebril", AccessorySlot.OGEN, 15, R.drawable.pet_acc_zonnebril),
+    HARTJESBRIL("Hartjesbril", AccessorySlot.OGEN, 25, R.drawable.pet_acc_hartjesbril),
+    RODE_SJAAL("Rode sjaal", AccessorySlot.NEK, 5, R.drawable.pet_acc_rode_sjaal),
+    STREEPJESSJAAL("Streepjessjaal", AccessorySlot.NEK, 10, R.drawable.pet_acc_streepjessjaal),
     GOUDEN_POLLEPEL("Gouden pollepel van PKU research", AccessorySlot.HAND, 100, R.drawable.pet_acc_gouden_pollepel),
     ;
 
