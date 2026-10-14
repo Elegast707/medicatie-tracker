@@ -3,6 +3,7 @@ package nl.medicatietracker.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,11 +37,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -47,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +82,7 @@ private val DRAW_ORDER = listOf(AccessorySlot.NEK, AccessorySlot.OGEN, Accessory
 
 private const val EAT_DURATION_MS = 1600L
 private const val PET_DURATION_MS = 1400L
+private val DRAG_SIZE = 64.dp
 
 @Composable
 fun PetScreen(app: MedApp) {
@@ -87,6 +96,11 @@ fun PetScreen(app: MedApp) {
     var tab by rememberSaveable { mutableStateOf(PetTab.ETEN) }
     var eating by remember { mutableStateOf<Pair<Food, Long>?>(null) }
     var pettedAt by remember { mutableStateOf<Long?>(null) }
+    // Slepen van eten naar het blobje; alle posities in coördinaten van het hele scherm.
+    var dragged by remember { mutableStateOf<Food?>(null) }
+    var dragPos by remember { mutableStateOf(Offset.Zero) }
+    var sceneBounds by remember { mutableStateOf(Rect.Zero) }
+    var screenOrigin by remember { mutableStateOf(Offset.Zero) }
     var bubble by remember { mutableStateOf<String?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var namePromptDismissed by rememberSaveable { mutableStateOf(false) }
@@ -103,10 +117,22 @@ fun PetScreen(app: MedApp) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Px.navy)) {
+    Box(Modifier.fillMaxSize().background(Px.navy).onGloballyPositioned { screenOrigin = it.positionInRoot() }) {
         val state = pet ?: return@Box
         val mood = state.mood(now)
         val happiness = state.happinessNow(now)
+        val feed: (Food) -> Unit = { item ->
+            scope.launch {
+                when (repo.feed(item)) {
+                    FeedResult.GEGETEN -> {
+                        eating = item to System.currentTimeMillis()
+                        bubble = "Mmm, ${item.label.lowercase(DUTCH)}!"
+                    }
+                    FeedResult.GEEN_ETEN -> Unit
+                }
+            }
+        }
+        val overPet = dragged != null && sceneBounds.contains(dragPos)
         val stroke: () -> Unit = {
             pettedAt = System.currentTimeMillis()
             scope.launch {
@@ -133,12 +159,13 @@ fun PetScreen(app: MedApp) {
                 PixelText("${state.coins}", size = 14.sp, color = Px.yellow)
             }
 
-            Box(Modifier.fillMaxWidth().aspectRatio(64f / 48f)) {
+            Box(Modifier.fillMaxWidth().aspectRatio(64f / 48f).onGloballyPositioned { sceneBounds = it.boundsInRoot() }) {
                 PetScene(
                     state,
                     mood,
                     eating,
                     pettedAt,
+                    overPet,
                     Modifier
                         .fillMaxSize()
                         .pointerInput(Unit) { detectTapGestures { stroke() } }
@@ -176,17 +203,20 @@ fun PetScreen(app: MedApp) {
             }
 
             when (tab) {
-                PetTab.ETEN -> FoodTab(food) { item ->
-                    scope.launch {
-                        when (repo.feed(item)) {
-                            FeedResult.GEGETEN -> {
-                                eating = item to System.currentTimeMillis()
-                                bubble = "Mmm, ${item.label.lowercase(DUTCH)}!"
-                            }
-                            FeedResult.GEEN_ETEN -> Unit
-                        }
-                    }
-                }
+                PetTab.ETEN -> FoodTab(
+                    food,
+                    onFeed = feed,
+                    onDragStart = { item, at ->
+                        dragged = item
+                        dragPos = at
+                    },
+                    onDrag = { delta -> dragPos += delta },
+                    onDragEnd = {
+                        val item = dragged
+                        if (item != null && sceneBounds.contains(dragPos)) feed(item)
+                        dragged = null
+                    },
+                )
                 PetTab.WINKEL -> ShopTab(state, owned, onBuyFood = { item ->
                     scope.launch {
                         bubble = if (repo.buyFood(item)) "Gekocht: ${item.label.lowercase(DUTCH)}!" else "Te weinig muntjes..."
@@ -198,6 +228,17 @@ fun PetScreen(app: MedApp) {
                 })
                 PetTab.KAST -> WardrobeTab(state, owned) { item -> scope.launch { repo.toggleEquipped(item) } }
             }
+        }
+
+        dragged?.let { item ->
+            val half = with(LocalDensity.current) { (DRAG_SIZE / 2).toPx() }
+            PixelImage(
+                item.drawable,
+                null,
+                Modifier
+                    .offset { (dragPos - screenOrigin - Offset(half, half)).round() }
+                    .size(DRAG_SIZE),
+            )
         }
 
         if (renaming || (state.name.isBlank() && !namePromptDismissed)) {
@@ -235,7 +276,15 @@ private fun blobFrames(): Map<String, List<ImageBitmap>> = mapOf(
 
 /** De kamer met het blobje, getekend op een raster van 64×48 pixels en met hele factoren vergroot. */
 @Composable
-private fun PetScene(pet: PetState, mood: PetMood, eating: Pair<Food, Long>?, pettedAt: Long?, modifier: Modifier) {
+private fun PetScene(
+    pet: PetState,
+    mood: PetMood,
+    eating: Pair<Food, Long>?,
+    pettedAt: Long?,
+    /** Er wordt eten boven het blobje gehouden: dan doet hij zijn mond al open. */
+    foodAbove: Boolean,
+    modifier: Modifier,
+) {
     val background = ImageBitmap.imageResource(R.drawable.pet_background)
     val heart = ImageBitmap.imageResource(R.drawable.pet_heart)
     val frames = blobFrames()
@@ -269,6 +318,7 @@ private fun PetScene(pet: PetState, mood: PetMood, eating: Pair<Food, Long>?, pe
         val frame = ((time / 500) % 2).toInt()
         val face = when {
             isEating -> if ((time / 200) % 2 == 0L) "eat" else "happy"
+            foodAbove -> "eat"
             isPetted -> "happy"
             else -> moodSprite(mood)
         }
@@ -357,16 +407,39 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun FoodTab(food: Map<Food, Int>, onFeed: (Food) -> Unit) {
+private fun FoodTab(
+    food: Map<Food, Int>,
+    onFeed: (Food) -> Unit,
+    onDragStart: (Food, Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+) {
     if (food.isEmpty()) {
         PixelPanel(Modifier.fillMaxWidth()) {
             PixelText("Nog geen eten. Vink medicatie of taken af om eten te verdienen!", size = 9.sp)
         }
         return
     }
-    SectionTitle("Tik om te voeren")
+    SectionTitle("Tik of sleep naar je blobje om te voeren")
     PixelGrid(Food.entries.filter { (food[it] ?: 0) > 0 }, columns = 4) { item ->
-        PixelPanel(Modifier.weight(1f).clickable { onFeed(item) }, contentPadding = 8.dp) {
+        var origin by remember { mutableStateOf(Offset.Zero) }
+        PixelPanel(
+            Modifier
+                .weight(1f)
+                .onGloballyPositioned { origin = it.positionInRoot() }
+                .clickable { onFeed(item) }
+                .pointerInput(item) {
+                    detectDragGestures(
+                        onDragStart = { onDragStart(item, origin + it) },
+                        onDragEnd = onDragEnd,
+                        onDragCancel = onDragEnd,
+                    ) { change, delta ->
+                        change.consume()
+                        onDrag(delta)
+                    }
+                },
+            contentPadding = 8.dp,
+        ) {
             PixelImage(item.drawable, item.label, Modifier.fillMaxWidth().aspectRatio(1f))
             PixelText("x${food[item]}", size = 9.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         }

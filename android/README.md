@@ -25,7 +25,8 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
   Het blobje heeft twee balken: **buik** en **blij**. De buik loopt in een dag (24 uur) leeg; dan
   krijgt hij honger en wordt hij rood, ook in het tabblad onderaan. Ook de blijheid loopt in 24 uur
   van vol naar leeg, en twee keer zo snel als hij honger heeft. Aai je blobje door erop te tikken of
-  eroverheen te vegen: dat kan altijd en geeft elke keer 10 punten. Met honger kun je hem zo
+  eroverheen te vegen: dat kan altijd en geeft elke keer 10 punten. Voeren doe je door op het eten
+  te tikken of het naar je blobje te slepen. Met honger kun je hem zo
   hooguit half blij maken; dan wil hij eerst eten. Eten geeft ook 15 punten blijheid. Doodgaan kan niet. Elke nieuw
   verdiende ster levert muntjes op: brons 10, zilver 25, goud 50, blauw 200. Daarmee koop je in de
   winkel lekker eten (pizza, patat, macaroni, pannenkoek) en accessoires: brillen, zonnebrillen,
