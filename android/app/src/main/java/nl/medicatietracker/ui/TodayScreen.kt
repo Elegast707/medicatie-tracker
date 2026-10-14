@@ -39,7 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nl.medicatietracker.MedApp
 import nl.medicatietracker.data.DUTCH
 import nl.medicatietracker.data.ItemType
@@ -67,6 +70,7 @@ fun TodayScreen(app: MedApp) {
     val logsByItem = logs.associateBy { it.itemId }
     val nowMinute = now.hour * 60 + now.minute
 
+    val context = LocalContext.current
     val doneCount = items.count { logsByItem[it.id] != null }
     val title = today.format(dayFormatter).replaceFirstChar { it.uppercase(DUTCH) }
 
@@ -111,7 +115,17 @@ fun TodayScreen(app: MedApp) {
                         item = item,
                         log = log,
                         overdue = log == null && nowMinute >= item.minuteOfDay,
-                        onLog = { status -> app.appScope.launch { app.repository.setStatus(item.id, epochDay, status) } },
+                        onLog = { status ->
+                            app.appScope.launch {
+                                val food = app.repository.setStatus(item.id, epochDay, status)
+                                if (food != null) {
+                                    val petName = app.petRepository.ensurePet().displayName
+                                    withContext(Dispatchers.Main) {
+                                        Toast.makeText(context, "+1 ${food.label.lowercase(DUTCH)} voor $petName!", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        },
                         onUndo = { app.appScope.launch { app.repository.clearStatus(item.id, epochDay) } },
                     )
                 }

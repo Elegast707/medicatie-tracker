@@ -20,9 +20,16 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
   30, goud vanaf 90 en blauw vanaf 365. Met een ster kleurt de app goud, zonder ster grijs. Wordt
   een ster vervangen door een hogere of breekt je reeks, dan gaat hij naar je sterrencollectie
   (tik op de ster, of via Beheren).
-- **Beheren**: items toevoegen, wijzigen, tijdelijk uitzetten of verwijderen (de geschiedenis blijft
-  bewaard). Per item stel je in of *Overslaan* je reeks breekt. Via *Testmelding sturen* controleer
-  je of meldingen werken.
+- **Blobje**: je eigen virtual pet in 16-bit stijl, met een naam die je zelf kiest. Elke keer dat je
+  iets afvinkt verdien je basiseten (brood, een drankje of een wortel; één keer per item per dag).
+  Heeft je blobje een dag (24 uur) niets gegeten, dan krijgt hij honger: hij wordt rood en
+  verdrietig, ook in het tabblad onderaan. Doodgaan kan niet; voeren maakt hem weer blij. Elke nieuw
+  verdiende ster levert muntjes op: brons 10, zilver 25, goud 50, blauw 200. Daarmee koop je in de
+  winkel lekker eten (pizza, patat, macaroni, pannenkoek) en accessoires: brillen, zonnebrillen,
+  hoeden, sjaaltjes en de gouden pollepel van PKU research. Je start met 20 muntjes.
+- **Beheren** (zijmenu, knop linksboven): items toevoegen, wijzigen, tijdelijk uitzetten of
+  verwijderen (de geschiedenis blijft bewaard). Per item stel je in of *Overslaan* je reeks breekt.
+  Via *Testmelding sturen* controleer je of meldingen werken.
 
 Bij de eerste start staat het schema uit de oude web-app er al in (Lophlex 08:00, 12:00 en 18:00,
 calciumtabletten om 20:00). Alle gegevens blijven op je telefoon.
@@ -66,3 +73,12 @@ Maak de sleutel maar één keer aan: met een nieuwe sleutel kun je de bestaande 
   unit-tests. Builds van `main` worden een gewone release, andere branches een pre-release.
 
 Zelf bouwen: open de map `android/` in Android Studio, of voer `./gradlew assembleRelease` uit.
+
+### Pixelart en lettertype
+
+- Alle pixelart van het blobje (Sweetie 16-palet) wordt gemaakt door `tools/generate_sprites.py`
+  (`python3 tools/generate_sprites.py`, vereist Pillow) en staat in `app/src/main/res/drawable-nodpi/`.
+  Een plaatje vervangen kan door een PNG met dezelfde naam en afmetingen neer te zetten
+  (blobje en accessoires 32×32, eten 16×16, achtergrond 64×48).
+- Lettertype *Press Start 2P* door CodeMan38, onder de SIL Open Font License 1.1
+  (`licenses/OFL-PressStart2P.txt`).

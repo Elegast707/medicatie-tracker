@@ -15,7 +15,11 @@ private const val KEY_CELEBRATED_ON = "gevierdOp"
 private const val KEY_STREAK_START = "gevierdeReeksStart"
 private const val KEY_MILESTONE = "gevierdeMijlpaal"
 
-class TrackerRepository(private val context: Context, private val dao: TrackerDao) {
+class TrackerRepository(
+    private val context: Context,
+    private val dao: TrackerDao,
+    private val pet: PetRepository,
+) {
 
     val items: Flow<List<TrackedItem>> = dao.observeItems()
     val activeItems: Flow<List<TrackedItem>> = dao.observeActiveItems()
@@ -31,8 +35,9 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
 
     private val starLock = Mutex()
 
-    suspend fun setStatus(itemId: Long, epochDay: Long, status: LogStatus) {
-        val item = dao.item(itemId) ?: return
+    /** Logt een moment. Geeft het verdiende eten voor het blobje terug, als er iets verdiend is. */
+    suspend fun setStatus(itemId: Long, epochDay: Long, status: LogStatus): Food? {
+        val item = dao.item(itemId) ?: return null
         dao.upsertLog(
             LogEntry(
                 itemId = itemId,
@@ -46,8 +51,10 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
         )
         Notifications.cancel(context, itemId)
         reschedule(item)
-        celebrateMilestone()
-        syncStars()
+        val food = if (status == LogStatus.GEDAAN) pet.grantFoodFor(itemId, epochDay) else null
+        val coins = syncStars()
+        celebrateMilestone(coins)
+        return food
     }
 
     suspend fun clearStatus(itemId: Long, epochDay: Long) {
@@ -59,14 +66,18 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
     /**
      * Zet de ster rechtsboven gelijk met de huidige reeks en bewaart vervangen of verloren sterren
      * in de verzameling. Ook nodig als er niets is afgevinkt: een reeks breekt vanzelf na een gemiste dag.
+     * Elke nieuw verdiende ster levert muntjes op voor het blobje; geeft het aantal muntjes terug.
      */
-    suspend fun syncStars() {
-        starLock.withLock {
-            val now = LocalDateTime.now()
-            val streak = currentStreak(now) ?: StreakInfo(0, null, 0)
-            val changes = Stars.update(streak, dao.heldStar(), now.toLocalDate())
-            if (changes.isNotEmpty()) dao.saveStars(changes)
-        }
+    suspend fun syncStars(): Int = starLock.withLock {
+        val now = LocalDateTime.now()
+        val streak = currentStreak(now) ?: StreakInfo(0, null, 0)
+        val changes = Stars.update(streak, dao.heldStar(), now.toLocalDate())
+        if (changes.isEmpty()) return@withLock 0
+        dao.saveStars(changes)
+        // Nieuwe sterren hebben nog geen id; bestaande sterren die naar de verzameling gaan wel.
+        val coins = changes.filter { it.id == 0L }.sumOf { PetRules.coinsForStar(it.tier) }
+        if (coins > 0) pet.addCoins(coins)
+        coins
     }
 
     suspend fun save(item: TrackedItem) {
@@ -91,21 +102,29 @@ class TrackerRepository(private val context: Context, private val dao: TrackerDa
 
     suspend fun exportData(): Pair<List<TrackedItem>, List<LogEntry>> = dao.allItems() to dao.allLogs()
 
-    /** Stuurt een felicitatie als de huidige reeks een nieuwe mijlpaal heeft bereikt. */
-    private suspend fun celebrateMilestone() {
+    /**
+     * Stuurt een felicitatie als de huidige reeks een nieuwe mijlpaal heeft bereikt, met de muntjes
+     * die er net mee verdiend zijn.
+     */
+    private suspend fun celebrateMilestone(coins: Int) {
         val now = LocalDateTime.now()
-        val streak = currentStreak(now) ?: return
+        val petName = pet.ensurePet().displayName
+        val streak = currentStreak(now)
 
         val prefs = context.getSharedPreferences(PREFS_ACHIEVEMENTS, Context.MODE_PRIVATE)
         val celebratedOn = prefs.getLong(KEY_CELEBRATED_ON, prefs.getLong(KEY_STREAK_START, Long.MIN_VALUE))
         val last = Celebration(prefs.getInt(KEY_MILESTONE, 0), celebratedOn).takeIf { celebratedOn != Long.MIN_VALUE }
-        val milestone = Streaks.milestoneToCelebrate(streak, last) ?: return
+        val milestone = streak?.let { Streaks.milestoneToCelebrate(it, last) }
+        if (milestone == null) {
+            if (coins > 0) Notifications.showCoins(context, coins, petName)
+            return
+        }
 
         prefs.edit()
             .putLong(KEY_CELEBRATED_ON, now.toLocalDate().toEpochDay())
             .putInt(KEY_MILESTONE, milestone)
             .apply()
-        Notifications.showMilestone(context, milestone)
+        Notifications.showMilestone(context, milestone, coins, petName)
     }
 
     private suspend fun currentStreak(now: LocalDateTime): StreakInfo? {

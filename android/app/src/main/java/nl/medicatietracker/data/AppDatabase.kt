@@ -7,14 +7,22 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [TrackedItem::class, LogEntry::class, StarEntry::class], version = 3, exportSchema = false)
+@Database(
+    entities = [
+        TrackedItem::class, LogEntry::class, StarEntry::class,
+        PetState::class, FoodStock::class, OwnedAccessory::class, FoodReward::class,
+    ],
+    version = 4,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): TrackerDao
+    abstract fun petDao(): PetDao
 
     companion object {
-        fun build(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "medicatie.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        fun build(context: Context, name: String = "medicatie.db"): AppDatabase =
+            Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(SeedCallback)
                 .build()
 
@@ -32,6 +40,29 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS stars (" +
                         "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, tier TEXT NOT NULL, " +
                         "earnedOn INTEGER NOT NULL, collectedOn INTEGER, reason TEXT)",
+                )
+            }
+        }
+
+        /** Versie 4: het blobje (huisdier), zijn eten, accessoires en beloningen. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pet` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, " +
+                        "`fullness` INTEGER NOT NULL, `fullnessAt` INTEGER NOT NULL, `coins` INTEGER NOT NULL, " +
+                        "`head` TEXT, `eyes` TEXT, `neck` TEXT, `hand` TEXT, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pet_food` (`foodId` TEXT NOT NULL, `count` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`foodId`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pet_owned` (`accessoryId` TEXT NOT NULL, `boughtAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`accessoryId`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `food_rewards` (`itemId` INTEGER NOT NULL, `epochDay` INTEGER NOT NULL, " +
+                        "`foodId` TEXT NOT NULL, PRIMARY KEY(`itemId`, `epochDay`))",
                 )
             }
         }
