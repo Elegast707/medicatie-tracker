@@ -44,6 +44,7 @@ class MigrationTest {
         }
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { raw ->
             listOf("pet", "pet_food", "pet_owned", "food_rewards").forEach { raw.execSQL("DROP TABLE `$it`") }
+            raw.execSQL("INSERT INTO items (name, type, details, minuteOfDay, repeatMinutes, active, createdAt) VALUES ('Lophlex', 'MEDICATIE', '', 480, 30, 1, 0)")
             raw.execSQL("INSERT INTO logs (itemId, epochDay, status, loggedAt, itemName, itemType, scheduledMinute) VALUES (1, 20000, 'GEDAAN', 0, 'Lophlex', 'MEDICATIE', 480)")
             downgradeTo5(raw)
             raw.version = 3
@@ -52,7 +53,7 @@ class MigrationTest {
         val db = AppDatabase.build(context, name)
         val sql = db.openHelper.writableDatabase // voert de migratie en de schemacontrole uit
         fun count(table: String) = sql.query("SELECT COUNT(*) FROM `$table`").use { it.moveToFirst(); it.getInt(0) }
-        assertEquals(4, count("items"))
+        assertEquals(1, count("items"))
         assertEquals(1, count("logs"))
         assertEquals(0, count("pet"))
         assertEquals(0, count("stars"))

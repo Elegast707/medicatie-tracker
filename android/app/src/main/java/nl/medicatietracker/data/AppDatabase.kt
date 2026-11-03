@@ -25,7 +25,6 @@ abstract class AppDatabase : RoomDatabase() {
         fun build(context: Context, name: String = "medicatie.db"): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                .addCallback(SeedCallback)
                 .build()
 
         /** Versie 2: instelling per item of overslaan de reeks breekt. */
@@ -94,26 +93,6 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 // Bestaande sterren horen bij de medicatiereeks.
                 db.execSQL("ALTER TABLE `stars` ADD COLUMN `track` TEXT NOT NULL DEFAULT 'MEDICATIE'")
-            }
-        }
-    }
-
-    /** Vult bij de eerste start het schema uit de oude web-app in. */
-    private object SeedCallback : Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            val now = System.currentTimeMillis()
-            val seed = listOf(
-                Triple("Lophlex", 8 * 60, 30),
-                Triple("Lophlex", 12 * 60, 30),
-                Triple("Lophlex", 18 * 60, 30),
-                Triple("Calciumtabletten", 20 * 60, 15),
-            )
-            for ((name, minute, repeat) in seed) {
-                db.execSQL(
-                    "INSERT INTO items (name, type, details, minuteOfDay, repeatMinutes, active, createdAt) " +
-                        "VALUES (?, ?, '', ?, ?, 1, ?)",
-                    arrayOf<Any>(name, ItemType.MEDICATIE.name, minute, repeat, now),
-                )
             }
         }
     }
