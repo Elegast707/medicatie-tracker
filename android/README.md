@@ -35,8 +35,8 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
   verwijderen (de geschiedenis blijft bewaard). Per item stel je in of *Overslaan* je reeks breekt.
   Via *Testmelding sturen* controleer je of meldingen werken.
 
-Bij de eerste start staat het schema uit de oude web-app er al in (Lophlex 08:00, 12:00 en 18:00,
-calciumtabletten om 20:00). Alle gegevens blijven op je telefoon.
+Een nieuwe installatie begint leeg: je voegt zelf je medicatie en taken toe via *Beheren*. Bij een
+update blijven je bestaande items en geschiedenis gewoon staan. Alle gegevens blijven op je telefoon.
 
 ## Installeren op je telefoon
 
