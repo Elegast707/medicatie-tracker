@@ -91,7 +91,7 @@ fun TodayScreen(app: MedApp) {
         if (items.isEmpty()) {
             item {
                 Text(
-                    "Er staat nog niets ingepland. Voeg medicatie of taken toe via 'Beheren'.",
+                    "Er staat nog geen medicatie ingepland. Voeg die toe via het menu linksboven. Taken zet je in het tabblad Taken.",
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -141,17 +141,17 @@ fun TodayScreen(app: MedApp) {
 }
 
 /** Felgroen, zodat "Genomen" er in zowel het gouden als het grijze thema uitspringt. */
-private val DoneGreen = Color(0xFF1E8E3E)
-private val DoneGreenDark = Color(0xFF136B2C)
-private val DoneGreenEdge = Color(0xFF0B2E12)
+internal val DoneGreen = Color(0xFF1E8E3E)
+internal val DoneGreenDark = Color(0xFF136B2C)
+internal val DoneGreenEdge = Color(0xFF0B2E12)
 
 /** Groen pixelblokje met een wit vinkje. Net afgevinkt? Dan springt het met een veerkrachtige animatie tevoorschijn. */
 @Composable
-private fun DoneCheck(log: LogEntry) {
-    val fresh = remember(log.id) { System.currentTimeMillis() - log.loggedAt < 3_000 }
-    val pop = remember(log.id) { Animatable(if (fresh) 0f else 1f) }
-    val turn = remember(log.id) { Animatable(if (fresh) -90f else 0f) }
-    LaunchedEffect(log.id) {
+internal fun DoneCheck(key: Any, loggedAt: Long) {
+    val fresh = remember(key) { System.currentTimeMillis() - loggedAt < 3_000 }
+    val pop = remember(key) { Animatable(if (fresh) 0f else 1f) }
+    val turn = remember(key) { Animatable(if (fresh) -90f else 0f) }
+    LaunchedEffect(key) {
         if (!fresh) return@LaunchedEffect
         launch { turn.animateTo(0f, tween(400)) }
         pop.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow))
@@ -200,7 +200,7 @@ private fun TodayItemCard(
                 }
                 if (log != null) {
                     if (log.status == LogStatus.GEDAAN) {
-                        DoneCheck(log)
+                        DoneCheck(log.id, log.loggedAt)
                     } else {
                         StatusIcon(RowStatus.OVERGESLAGEN)
                     }

@@ -87,15 +87,17 @@ fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit) {
-    val held by app.repository.heldStar.collectAsStateWithLifecycle(null)
-    val collected by app.repository.collectedStars.collectAsStateWithLifecycle(emptyList())
+fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit, tasks: Boolean = false) {
+    // Taken hebben een eigen reeks en dus een eigen verzameling.
+    val held by (if (tasks) app.taskRepository.heldStar else app.repository.heldStar).collectAsStateWithLifecycle(null)
+    val collected by (if (tasks) app.taskRepository.collectedStars else app.repository.collectedStars)
+        .collectAsStateWithLifecycle(emptyList())
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Sterrencollectie") },
+                    title = { Text(if (tasks) "Takensterren" else "Sterrencollectie") },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) { Icon(painterResource(R.drawable.ic_px_close), contentDescription = "Sluiten", modifier = Modifier.size(24.dp)) }
                     },
@@ -104,7 +106,7 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
         ) { padding ->
             LazyColumn(Modifier.padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
-                item { CurrentStarCard(held) }
+                item { CurrentStarCard(held, tasks) }
                 item { TierCounts(collected) }
                 if (collected.isEmpty()) {
                     item {
@@ -136,7 +138,7 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun CurrentStarCard(held: StarEntry?) {
+private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
     PixelCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (held != null) {
@@ -155,7 +157,11 @@ private fun CurrentStarCard(held: StarEntry?) {
                 }
             } else {
                 Text(
-                    "Je hebt nu geen ster. Vink ${StarTier.BRONS.days} dagen op rij alles af voor een ${StarTier.BRONS.label.lowercase(DUTCH)}.",
+                    if (tasks) {
+                        "Je hebt nog geen takenster. Doe ${StarTier.BRONS.days} dagen op rij al je taken voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
+                    } else {
+                        "Je hebt nu geen ster. Vink ${StarTier.BRONS.days} dagen op rij alles af voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

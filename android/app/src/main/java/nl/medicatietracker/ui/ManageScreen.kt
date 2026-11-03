@@ -70,9 +70,11 @@ fun ManageScreen(app: MedApp, onOpenStars: () -> Unit) {
             item { ScreenTitle("Beheren", "Tik op een item om het te wijzigen") }
             for (type in ItemType.entries) {
                 val group = items.filter { it.type == type }
+                // Taken hebben nu een eigen tabblad; oude taken met een tijdstip blijven hier zichtbaar.
+                if (type == ItemType.TAAK && group.isEmpty()) continue
                 item(key = "header-$type") {
                     Text(
-                        if (type == ItemType.MEDICATIE) "Medicatie" else "Taken",
+                        if (type == ItemType.MEDICATIE) "Medicatie" else "Taken met tijdstip",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
@@ -185,10 +187,11 @@ private fun EditItemDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isNew) "Nieuw item" else "Item wijzigen") },
+        title = { Text(if (isNew) "Nieuwe medicatie" else "Item wijzigen") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Nieuwe taken maak je in het tabblad Taken; alleen een oude taak kan hier nog van soort wisselen.
+                if (initial.type == ItemType.TAAK) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = type == ItemType.MEDICATIE, onClick = { type = ItemType.MEDICATIE }, label = { Text("Medicatie") })
                     FilterChip(selected = type == ItemType.TAAK, onClick = { type = ItemType.TAAK }, label = { Text("Taak") })
                 }

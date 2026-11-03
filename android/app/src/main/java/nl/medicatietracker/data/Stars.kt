@@ -1,6 +1,7 @@
 package nl.medicatietracker.data
 
 import androidx.annotation.DrawableRes
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import nl.medicatietracker.R
@@ -21,6 +22,9 @@ enum class StarTier(val days: Int, val label: String, @DrawableRes val drawable:
 
 enum class StarReason { VERVANGEN, GEBROKEN }
 
+/** Waar een ster mee verdiend is: de medicatiereeks of de aparte takenreeks. */
+enum class StarTrack { MEDICATIE, TAKEN }
+
 /**
  * Een verdiende ster. Zonder [collectedOn] is het de ster die nu rechtsboven staat; daarna hoort
  * hij bij de verzameling.
@@ -34,6 +38,7 @@ data class StarEntry(
     /** Dag (epochDay) waarop de ster vervangen is of de reeks brak. */
     val collectedOn: Long? = null,
     val reason: StarReason? = null,
+    @ColumnInfo(defaultValue = "MEDICATIE") val track: StarTrack = StarTrack.MEDICATIE,
 )
 
 object Stars {
@@ -43,7 +48,12 @@ object Stars {
      * Wordt een niveau overgeslagen (bijvoorbeeld door een eerdere dag aan te passen), dan komt dat
      * niveau ook in de verzameling.
      */
-    fun update(streak: StreakInfo, held: StarEntry?, today: LocalDate): List<StarEntry> {
+    fun update(
+        streak: StreakInfo,
+        held: StarEntry?,
+        today: LocalDate,
+        track: StarTrack = StarTrack.MEDICATIE,
+    ): List<StarEntry> {
         val day = today.toEpochDay()
         val changes = mutableListOf<StarEntry>()
         var current = held
@@ -61,9 +71,9 @@ object Stars {
 
         current?.let { changes += it.copy(collectedOn = day, reason = StarReason.VERVANGEN) }
         StarTier.entries.filter { (from == null || it > from) && it < tier }.forEach {
-            changes += StarEntry(tier = it, earnedOn = day, collectedOn = day, reason = StarReason.VERVANGEN)
+            changes += StarEntry(tier = it, earnedOn = day, collectedOn = day, reason = StarReason.VERVANGEN, track = track)
         }
-        changes += StarEntry(tier = tier, earnedOn = day)
+        changes += StarEntry(tier = tier, earnedOn = day, track = track)
         return changes
     }
 }

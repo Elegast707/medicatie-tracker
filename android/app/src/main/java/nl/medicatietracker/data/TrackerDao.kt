@@ -52,14 +52,14 @@ interface TrackerDao {
     @Query("DELETE FROM logs WHERE itemId = :itemId AND epochDay = :epochDay")
     suspend fun deleteLog(itemId: Long, epochDay: Long)
 
-    @Query("SELECT * FROM stars WHERE collectedOn IS NULL ORDER BY id DESC LIMIT 1")
-    fun observeHeldStar(): Flow<StarEntry?>
+    @Query("SELECT * FROM stars WHERE collectedOn IS NULL AND track = :track ORDER BY id DESC LIMIT 1")
+    fun observeHeldStar(track: String): Flow<StarEntry?>
 
-    @Query("SELECT * FROM stars WHERE collectedOn IS NULL ORDER BY id DESC LIMIT 1")
-    suspend fun heldStar(): StarEntry?
+    @Query("SELECT * FROM stars WHERE collectedOn IS NULL AND track = :track ORDER BY id DESC LIMIT 1")
+    suspend fun heldStar(track: String): StarEntry?
 
-    @Query("SELECT * FROM stars WHERE collectedOn IS NOT NULL ORDER BY collectedOn DESC, id DESC")
-    fun observeCollectedStars(): Flow<List<StarEntry>>
+    @Query("SELECT * FROM stars WHERE collectedOn IS NOT NULL AND track = :track ORDER BY collectedOn DESC, id DESC")
+    fun observeCollectedStars(track: String): Flow<List<StarEntry>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveStars(stars: List<StarEntry>)
