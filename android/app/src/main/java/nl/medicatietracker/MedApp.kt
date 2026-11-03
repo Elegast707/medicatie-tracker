@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import nl.medicatietracker.data.AppDatabase
 import nl.medicatietracker.data.PetRepository
+import nl.medicatietracker.data.TaskRepository
 import nl.medicatietracker.data.TrackerRepository
 import nl.medicatietracker.reminders.Notifications
 
@@ -17,6 +18,7 @@ class MedApp : Application() {
     val database: AppDatabase by lazy { AppDatabase.build(this) }
     val petRepository: PetRepository by lazy { PetRepository(database) }
     val repository: TrackerRepository by lazy { TrackerRepository(this, database.dao(), petRepository) }
+    val taskRepository: TaskRepository by lazy { TaskRepository(this, database, petRepository) }
 
     override fun onCreate() {
         super.onCreate()

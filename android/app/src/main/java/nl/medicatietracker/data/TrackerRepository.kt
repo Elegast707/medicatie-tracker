@@ -30,8 +30,8 @@ class TrackerRepository(
     val allLogs: Flow<List<LogEntry>> = dao.observeAllLogs()
 
     /** De ster die nu rechtsboven staat, of null zonder reeks van minstens een week. */
-    val heldStar: Flow<StarEntry?> = dao.observeHeldStar()
-    val collectedStars: Flow<List<StarEntry>> = dao.observeCollectedStars()
+    val heldStar: Flow<StarEntry?> = dao.observeHeldStar(StarTrack.MEDICATIE.name)
+    val collectedStars: Flow<List<StarEntry>> = dao.observeCollectedStars(StarTrack.MEDICATIE.name)
 
     private val starLock = Mutex()
 
@@ -71,7 +71,7 @@ class TrackerRepository(
     suspend fun syncStars(): Int = starLock.withLock {
         val now = LocalDateTime.now()
         val streak = currentStreak(now) ?: StreakInfo(0, null, 0)
-        val changes = Stars.update(streak, dao.heldStar(), now.toLocalDate())
+        val changes = Stars.update(streak, dao.heldStar(StarTrack.MEDICATIE.name), now.toLocalDate())
         if (changes.isEmpty()) return@withLock 0
         dao.saveStars(changes)
         // Nieuwe sterren hebben nog geen id; bestaande sterren die naar de verzameling gaan wel.

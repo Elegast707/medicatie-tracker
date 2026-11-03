@@ -49,6 +49,7 @@ import nl.medicatietracker.data.History
 import nl.medicatietracker.data.PetMood
 import nl.medicatietracker.data.StarEntry
 import nl.medicatietracker.data.Streaks
+import nl.medicatietracker.data.TaskRules
 import nl.medicatietracker.ui.HistoryScreen
 import nl.medicatietracker.ui.ManageScreen
 import nl.medicatietracker.ui.AppTint
@@ -59,6 +60,7 @@ import nl.medicatietracker.ui.PixelTabButton
 import nl.medicatietracker.ui.pixelEdge
 import nl.medicatietracker.ui.StreakBadge
 import nl.medicatietracker.ui.StarCollectionDialog
+import nl.medicatietracker.ui.TasksScreen
 import nl.medicatietracker.ui.TodayScreen
 import nl.medicatietracker.ui.rememberNow
 
@@ -89,6 +91,8 @@ class MainActivity : ComponentActivity() {
 private const val TAB_TODAY = 0
 private const val TAB_HISTORY = 1
 private const val TAB_PET = 2
+// Nieuwer tabblad; het nummer staat los van de volgorde onderaan.
+private const val TAB_TASKS = 3
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +103,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
     val pet by app.petRepository.pet.collectAsStateWithLifecycle(null)
     val petName = pet?.displayName ?: "Blobje"
     var showStars by rememberSaveable { mutableStateOf(false) }
+    var showTaskStars by rememberSaveable { mutableStateOf(false) }
     val now by rememberNow()
     val today = now.toLocalDate()
     val items by app.repository.allItems.collectAsStateWithLifecycle(emptyList())
@@ -106,11 +111,23 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
     val streakDays = remember(items, logs, now) {
         Streaks.compute(History.build(items, logs, History.firstDay(items, logs) ?: today, today, now)).current
     }
+    val tasks by app.taskRepository.allTasks.collectAsStateWithLifecycle(emptyList())
+    val taskLogs by app.taskRepository.logs.collectAsStateWithLifecycle(emptyList())
+    val taskStreakDays = remember(tasks, taskLogs, now) { TaskRules.streak(tasks, taskLogs, now).current }
+    val taskStar by app.taskRepository.heldStar.collectAsStateWithLifecycle(null)
 
     // Een reeks kan ook breken zonder dat er iets wordt afgevinkt, dus bij openen en elke nieuwe dag bijwerken.
-    LaunchedEffect(today) { app.appScope.launch { app.repository.syncStars() } }
+    LaunchedEffect(today) {
+        app.appScope.launch {
+            app.repository.syncStars()
+            app.taskRepository.syncStars()
+        }
+    }
     LifecycleResumeEffect(Unit) {
-        app.appScope.launch { app.repository.syncStars() }
+        app.appScope.launch {
+            app.repository.syncStars()
+            app.taskRepository.syncStars()
+        }
         onPauseOrDispose { }
     }
 
@@ -143,7 +160,14 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                             )
                         }
                     },
-                    actions = { StreakBadge(streakDays, star, onClick = { showStars = true }) },
+                    // In het tabblad Taken staat rechtsboven de aparte takenreeks.
+                    actions = {
+                        if (selected == TAB_TASKS) {
+                            StreakBadge(taskStreakDays, taskStar, onClick = { showTaskStars = true })
+                        } else {
+                            StreakBadge(streakDays, star, onClick = { showStars = true })
+                        }
+                    },
                     modifier = Modifier.pixelEdgeLine(edge, top = false),
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -163,6 +187,13 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                         onClick = { selected = TAB_TODAY },
                         icon = { NavIcon(selected == TAB_TODAY, R.drawable.ic_px_home) },
                         label = { Text("Vandaag") },
+                        colors = navColors,
+                    )
+                    NavigationBarItem(
+                        selected = selected == TAB_TASKS,
+                        onClick = { selected = TAB_TASKS },
+                        icon = { NavIcon(selected == TAB_TASKS, R.drawable.ic_px_tasks) },
+                        label = { Text("Taken") },
                         colors = navColors,
                     )
                     NavigationBarItem(
@@ -201,6 +232,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
             Box(Modifier.fillMaxSize().padding(padding)) {
                 when (selected) {
                     TAB_TODAY -> TodayScreen(app)
+                    TAB_TASKS -> TasksScreen(app, onOpenStars = { showTaskStars = true })
                     TAB_HISTORY -> HistoryScreen(app)
                     else -> PetScreen(app)
                 }
@@ -210,6 +242,9 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
 
     if (showStars) {
         StarCollectionDialog(app, onDismiss = { showStars = false })
+    }
+    if (showTaskStars) {
+        StarCollectionDialog(app, onDismiss = { showTaskStars = false }, tasks = true)
     }
 }
 

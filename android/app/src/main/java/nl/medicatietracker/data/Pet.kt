@@ -248,6 +248,12 @@ class PetRepository(private val db: AppDatabase) {
         food
     }
 
+    /**
+     * Basiseten voor een afgevinkte taak, ook één keer per taak per dag. Taken gebruiken dezelfde tabel
+     * als medicatie, met een negatief id zodat ze nooit botsen met een medicatie-item.
+     */
+    suspend fun grantFoodForTask(taskId: Long, epochDay: Long): Food? = grantFoodFor(-taskId, epochDay)
+
     suspend fun addCoins(amount: Int) = db.withTransaction {
         val pet = ensurePet()
         dao.savePet(pet.copy(coins = pet.coins + amount))

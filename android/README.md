@@ -9,6 +9,16 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
 - **Meldingen**: op het ingestelde tijdstip krijg je een melding met de knoppen *Genomen/Gedaan* en
   *Overslaan*. Vink je niets af, dan komt de melding elke X minuten terug (per item instelbaar), tot
   middernacht. Herinneringen blijven werken na een herstart van de telefoon.
+- **Taken**: een apart tabblad voor dingen die je op een dag moet doen, los van je medicatie. Een
+  taak is eenmalig (op een gekozen datum) of komt terug: elke dag, op gekozen weekdagen of elke X
+  dagen. Bovenin staat een maandkalender: elke dag laat zien hoeveel taken er staan en hoeveel je
+  er gedaan hebt (groen = alles gedaan, rood = iets blijven liggen). Tik op een dag om de taken van
+  die dag te zien, en op + om er een taak aan toe te voegen. Tik op *Gedaan* om af te vinken. Taken hebben een **eigen reeks** en eigen sterren (brons 7,
+  zilver 30, goud 90, blauw 365 dagen): een dag telt als al je taken van die dag gedaan zijn, en een
+  dag zonder taken breekt de reeks niet. In het tabblad Taken staat rechtsboven je takenreeks; tik
+  erop voor je takensterren. Elke afgevinkte taak levert eten op voor je blobje, en elke nieuwe
+  takenster muntjes. Pas je het schema van een taak aan, dan geldt dat vanaf vandaag; eerdere dagen
+  blijven kloppen.
 - **Geschiedenis**: per dag wat je gedaan, overgeslagen of gemist hebt, het percentage per item en
   het aantal dagen op rij dat alles compleet was. Tik op een regel om achteraf iets af te vinken.
   Met het deel-icoon exporteer je alles als CSV-bestand (te openen in Excel).

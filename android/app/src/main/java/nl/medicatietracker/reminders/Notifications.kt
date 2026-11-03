@@ -25,6 +25,7 @@ object Notifications {
     private const val ACHIEVEMENT_CHANNEL_ID = "prestaties"
     private const val TEST_NOTIFICATION_ID = 999_999
     private const val MILESTONE_NOTIFICATION_ID = 888_888
+    private const val TASK_MILESTONE_NOTIFICATION_ID = 888_889
 
     const val ACTION_LOG = "nl.medicatietracker.LOG"
     const val EXTRA_ITEM_ID = "itemId"
@@ -75,20 +76,25 @@ object Notifications {
         notify(context, TEST_NOTIFICATION_ID, builder)
     }
 
-    fun showMilestone(context: Context, milestone: Int, coins: Int, petName: String) {
-        val text = Streaks.message(milestone) +
-            if (coins > 0) " Je verdiende $coins muntjes voor $petName!" else ""
-        val builder = baseBuilder(context, MILESTONE_NOTIFICATION_ID, "🎉 ${Streaks.title(milestone)}", text, ACHIEVEMENT_CHANNEL_ID)
+    /** Met [tasks] gaat het om de aparte takenreeks; die krijgt een eigen melding. */
+    fun showMilestone(context: Context, milestone: Int, coins: Int, petName: String, tasks: Boolean = false) {
+        val message = if (tasks) "$milestone dagen op rij al je taken gedaan. Ga zo door!" else Streaks.message(milestone)
+        val text = message + if (coins > 0) " Je verdiende $coins muntjes voor $petName!" else ""
+        val title = (if (tasks) "🎉 Taken: " else "🎉 ") + Streaks.title(milestone)
+        val id = if (tasks) TASK_MILESTONE_NOTIFICATION_ID else MILESTONE_NOTIFICATION_ID
+        val builder = baseBuilder(context, id, title, text, ACHIEVEMENT_CHANNEL_ID)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-        notify(context, MILESTONE_NOTIFICATION_ID, builder)
+        notify(context, id, builder)
     }
 
-    fun showCoins(context: Context, coins: Int, petName: String) {
-        val builder = baseBuilder(context, MILESTONE_NOTIFICATION_ID, "⭐ Nieuwe ster!", "Je verdiende $coins muntjes voor $petName!", ACHIEVEMENT_CHANNEL_ID)
+    fun showCoins(context: Context, coins: Int, petName: String, tasks: Boolean = false) {
+        val id = if (tasks) TASK_MILESTONE_NOTIFICATION_ID else MILESTONE_NOTIFICATION_ID
+        val title = if (tasks) "⭐ Nieuwe takenster!" else "⭐ Nieuwe ster!"
+        val builder = baseBuilder(context, id, title, "Je verdiende $coins muntjes voor $petName!", ACHIEVEMENT_CHANNEL_ID)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-        notify(context, MILESTONE_NOTIFICATION_ID, builder)
+        notify(context, id, builder)
     }
 
     fun cancel(context: Context, itemId: Long) {

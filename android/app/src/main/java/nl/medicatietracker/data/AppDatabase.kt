@@ -11,18 +11,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         TrackedItem::class, LogEntry::class, StarEntry::class,
         PetState::class, FoodStock::class, OwnedAccessory::class, FoodReward::class,
+        TaskItem::class, TaskLog::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): TrackerDao
     abstract fun petDao(): PetDao
+    abstract fun taskDao(): TaskDao
 
     companion object {
         fun build(context: Context, name: String = "medicatie.db"): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
 
         /** Versie 2: instelling per item of overslaan de reeks breekt. */
@@ -73,6 +75,24 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `pet` ADD COLUMN `happinessAt` INTEGER NOT NULL DEFAULT 0")
                 // De blijheid begint te tellen vanaf de update, niet vanaf 1970.
                 db.execSQL("UPDATE `pet` SET `happinessAt` = ?", arrayOf<Any>(System.currentTimeMillis()))
+            }
+        }
+
+        /** Versie 6: het aparte tabblad Taken, met een eigen reeks en eigen sterren. */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `tasks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `details` TEXT NOT NULL, `recurrence` TEXT NOT NULL, " +
+                        "`startDay` INTEGER NOT NULL, `weekdays` INTEGER NOT NULL, `intervalDays` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `deletedAt` INTEGER)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `task_logs` (`taskId` INTEGER NOT NULL, `epochDay` INTEGER NOT NULL, " +
+                        "`doneAt` INTEGER NOT NULL, `taskName` TEXT NOT NULL, PRIMARY KEY(`taskId`, `epochDay`))",
+                )
+                // Bestaande sterren horen bij de medicatiereeks.
+                db.execSQL("ALTER TABLE `stars` ADD COLUMN `track` TEXT NOT NULL DEFAULT 'MEDICATIE'")
             }
         }
     }
