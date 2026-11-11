@@ -7,6 +7,9 @@ import nl.medicatietracker.data.TaskItem
 import nl.medicatietracker.data.TaskLog
 import nl.medicatietracker.data.TaskRecurrence
 import nl.medicatietracker.data.TaskRules
+import nl.medicatietracker.data.TaskStreak
+import nl.medicatietracker.data.TaskStreaks
+import nl.medicatietracker.reminders.TaskReminderScheduler
 import nl.medicatietracker.data.Weekdays
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -78,49 +81,108 @@ class TasksTest {
         assertFalse(t.occursOn(start.plusDays(2)))
     }
 
+    /** Maandag 5 januari 2026. */
+    private val monday = LocalDate.of(2026, 1, 5)
+
     @Test
-    fun streakCountsDaysWithAllTasksDoneAndSkipsEmptyDays() {
-        // Maandag en donderdag een taak; daartussen dagen zonder taken.
-        val mask = Weekdays.bit(DayOfWeek.MONDAY) or Weekdays.bit(DayOfWeek.THURSDAY)
+    fun weekWithOnlyTuesdayAndThursdayIsCompleteWhenBothAreDone() {
+        val mask = Weekdays.bit(DayOfWeek.TUESDAY) or Weekdays.bit(DayOfWeek.THURSDAY)
         val tasks = listOf(task(1, TaskRecurrence.WEEKDAGEN, weekdays = mask))
-        val logs = done(1, start, start.plusDays(4), start.plusDays(7))
-        val now = start.plusDays(8).atTime(LocalTime.NOON) // vrijdag, geen taken
-        val streak = TaskRules.streak(tasks, logs, now)
-        assertEquals(3, streak.current)
-        assertEquals(start, streak.currentStart)
+        val logs = done(1, monday.plusDays(1), monday.plusDays(3))
+        // Vrijdag: de rest van de week staat niets meer, dus de week is al voltooid.
+        val streak = TaskRules.streak(tasks, logs, monday.plusDays(4).atTime(LocalTime.NOON))
+        assertEquals(1, streak.weeks)
+        assertEquals(1, streak.bestWeeks)
     }
 
     @Test
-    fun missedTaskBreaksStreakButTodayStaysOpen() {
-        val tasks = listOf(task(1, TaskRecurrence.DAGELIJKS), task(2, TaskRecurrence.EENMALIG, startDay = start.plusDays(1)))
-        // Dag 2 is taak 2 niet gedaan: die dag breekt de reeks.
-        val logs = done(1, start, start.plusDays(1), start.plusDays(2))
-        val now = start.plusDays(3).atTime(LocalTime.NOON) // vandaag nog niets gedaan
-        val streak = TaskRules.streak(tasks, logs, now)
-        assertEquals(1, streak.current)
-        assertEquals(start.plusDays(2), streak.currentStart)
-        assertEquals(1, streak.best)
+    fun weekIsNotCompleteWhileTasksLaterInTheWeekAreOpen() {
+        val mask = Weekdays.bit(DayOfWeek.MONDAY) or Weekdays.bit(DayOfWeek.SUNDAY)
+        val tasks = listOf(task(1, TaskRecurrence.WEEKDAGEN, weekdays = mask))
+        val streak = TaskRules.streak(tasks, done(1, monday), monday.plusDays(2).atTime(LocalTime.NOON))
+        assertEquals(0, streak.weeks)
+        assertEquals(1, streak.weekDone)
+        assertEquals(2, streak.weekTotal)
+    }
+
+    @Test
+    fun missedTaskOnMondayMeansNoWeekBadge() {
+        val mask = Weekdays.bit(DayOfWeek.MONDAY) or Weekdays.bit(DayOfWeek.SUNDAY)
+        val tasks = listOf(task(1, TaskRecurrence.WEEKDAGEN, weekdays = mask))
+        val streak = TaskRules.streak(tasks, done(1, monday.plusDays(6)), monday.plusDays(6).atTime(LocalTime.NOON))
+        assertEquals(0, streak.weeks)
+        assertEquals(0, streak.bestWeeks)
+        assertEquals(monday.plusDays(1), streak.runStart)
+    }
+
+    @Test
+    fun weekWithoutTasksDoesNotBreakTheStreak() {
+        // Week 1 en week 3 een taak op maandag, week 2 niets.
+        val tasks = listOf(
+            task(1, TaskRecurrence.EENMALIG, startDay = monday),
+            task(2, TaskRecurrence.EENMALIG, startDay = monday.plusDays(14)),
+        )
+        val logs = done(1, monday) + done(2, monday.plusDays(14))
+        val streak = TaskRules.streak(tasks, logs, monday.plusDays(15).atTime(LocalTime.NOON))
+        assertEquals(2, streak.weeks)
+    }
+
+    @Test
+    fun fullMonthGivesTheMonthBadgeAndSilverStar() {
+        // Elke dag een taak vanaf 1 januari, alles gedaan t/m 31 januari.
+        val tasks = listOf(task(1, TaskRecurrence.DAGELIJKS))
+        val logs = done(1, *(0L..30L).map { start.plusDays(it) }.toTypedArray())
+        val streak = TaskRules.streak(tasks, logs, LocalDate.of(2026, 2, 1).atTime(8, 0))
+        assertEquals(1, streak.months)
+        // 1 jan (do) t/m 4 jan telt als week, daarna 5-11, 12-18, 19-25; 26 jan - 1 feb loopt nog.
+        assertEquals(4, streak.weeks)
+        assertTrue(TaskStreaks.BADGES[1].earned(streak))
+        assertFalse(TaskStreaks.BADGES[2].earned(streak))
+        val changes = Stars.update(streak.asStarStreak(), null, LocalDate.of(2026, 2, 1), StarTrack.TAKEN)
+        assertEquals(StarTier.ZILVER, changes.last().tier)
+        assertEquals(StarTrack.TAKEN, changes.last().track)
     }
 
     @Test
     fun noTasksMeansNoStreak() {
         val streak = TaskRules.streak(emptyList(), emptyList(), start.atTime(LocalTime.NOON))
-        assertEquals(0, streak.current)
-        assertNull(streak.currentStart)
+        assertEquals(0, streak.weeks)
+        assertNull(streak.runStart)
     }
 
     @Test
-    fun taskStarsAreKeptOnTheirOwnTrack() {
-        val streak = TaskRules.streak(
-            listOf(task(1, TaskRecurrence.DAGELIJKS)),
-            done(1, *(0L..6L).map { start.plusDays(it) }.toTypedArray()),
-            start.plusDays(6).atTime(LocalTime.NOON),
-        )
-        assertEquals(7, streak.current)
-        val changes = Stars.update(streak, null, start.plusDays(6), StarTrack.TAKEN)
-        assertEquals(1, changes.size)
-        assertEquals(StarTier.BRONS, changes.single().tier)
-        assertEquals(StarTrack.TAKEN, changes.single().track)
+    fun celebratesEachNewWeekAndMonthOnce() {
+        val streak = TaskStreak(weeks = 2, months = 0, bestWeeks = 2, bestMonths = 0, runStart = start)
+        assertEquals("2 weken op rij compleet!", TaskStreaks.milestoneToCelebrate(streak, 1, 0)?.title)
+        assertNull(TaskStreaks.milestoneToCelebrate(streak, 2, 0))
+        val month = streak.copy(weeks = 4, months = 1)
+        assertEquals("Een maand compleet!", TaskStreaks.milestoneToCelebrate(month, 4, 0)?.title)
+    }
+
+    @Test
+    fun reminderAtTaskTimeThenEveryHourUntilMidnight() {
+        val t = task(1, TaskRecurrence.DAGELIJKS).copy(minuteOfDay = 12 * 60)
+        val day = start.plusDays(1)
+        assertEquals(day.atTime(12, 0), TaskReminderScheduler.nextTrigger(t, false, day.atTime(9, 0)))
+        assertEquals(day.atTime(13, 0), TaskReminderScheduler.nextTrigger(t, false, day.atTime(12, 0, 30)))
+        assertEquals(day.atTime(23, 0), TaskReminderScheduler.nextTrigger(t, false, day.atTime(22, 10)))
+        // Na de laatste herinnering van de dag, of als hij al gedaan is: morgen op het tijdstip.
+        assertEquals(day.plusDays(1).atTime(12, 0), TaskReminderScheduler.nextTrigger(t, false, day.atTime(23, 30)))
+        assertEquals(day.plusDays(1).atTime(12, 0), TaskReminderScheduler.nextTrigger(t, true, day.atTime(9, 0)))
+    }
+
+    @Test
+    fun reminderSkipsDaysWithoutTheTaskAndStopsForPastOneOffTasks() {
+        val mask = Weekdays.bit(DayOfWeek.MONDAY)
+        val weekly = task(1, TaskRecurrence.WEEKDAGEN, weekdays = mask).copy(minuteOfDay = 8 * 60)
+        assertEquals(monday.plusDays(7).atTime(8, 0), TaskReminderScheduler.nextTrigger(weekly, true, monday.atTime(9, 0)))
+        val once = task(2, TaskRecurrence.EENMALIG, startDay = monday)
+        assertNull(TaskReminderScheduler.nextTrigger(once, true, monday.atTime(13, 0)))
+    }
+
+    @Test
+    fun newTaskDefaultsToNoon() {
+        assertEquals(12 * 60, TaskItem(name = "x", startDay = 0).minuteOfDay)
     }
 
     @Test

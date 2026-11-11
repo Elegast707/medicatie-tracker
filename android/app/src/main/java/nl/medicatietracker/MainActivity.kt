@@ -2,7 +2,6 @@ package nl.medicatietracker
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -11,11 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -24,14 +19,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -50,8 +43,7 @@ import nl.medicatietracker.data.PetMood
 import nl.medicatietracker.data.StarEntry
 import nl.medicatietracker.data.Streaks
 import nl.medicatietracker.data.TaskRules
-import nl.medicatietracker.ui.HistoryScreen
-import nl.medicatietracker.ui.ManageScreen
+import nl.medicatietracker.ui.MedicationScreen
 import nl.medicatietracker.ui.AppTint
 import nl.medicatietracker.ui.MedTheme
 import nl.medicatietracker.ui.PetScreen
@@ -98,8 +90,6 @@ private const val TAB_TASKS = 3
 @Composable
 private fun AppRoot(app: MedApp, star: StarEntry?) {
     var selected by rememberSaveable { mutableIntStateOf(TAB_TODAY) }
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     val pet by app.petRepository.pet.collectAsStateWithLifecycle(null)
     val petName = pet?.displayName ?: "Blobje"
     var showStars by rememberSaveable { mutableStateOf(false) }
@@ -113,7 +103,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
     }
     val tasks by app.taskRepository.allTasks.collectAsStateWithLifecycle(emptyList())
     val taskLogs by app.taskRepository.logs.collectAsStateWithLifecycle(emptyList())
-    val taskStreakDays = remember(tasks, taskLogs, now) { TaskRules.streak(tasks, taskLogs, now).current }
+    val taskStreakWeeks = remember(tasks, taskLogs, now) { TaskRules.streak(tasks, taskLogs, now).weeks }
     val taskStar by app.taskRepository.heldStar.collectAsStateWithLifecycle(null)
 
     // Een reeks kan ook breken zonder dat er iets wordt afgevinkt, dus bij openen en elke nieuwe dag bijwerken.
@@ -133,109 +123,84 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
 
     val edge = pixelEdge()
 
-    BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
-
-    // Beheren zit in het zijmenu; het menu opent met de knop linksboven of door te vegen.
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                ManageScreen(app, onOpenStars = {
-                    scope.launch { drawerState.close() }
-                    showStars = true
-                })
-            }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                // In het tabblad Taken staat rechtsboven de aparte takenreeks, in weken.
+                actions = {
+                    if (selected == TAB_TASKS) {
+                        StreakBadge(taskStreakWeeks, taskStar, onClick = { showTaskStars = true }, singular = "week", plural = "weken")
+                    } else {
+                        StreakBadge(streakDays, star, onClick = { showStars = true })
+                    }
+                },
+                modifier = Modifier.pixelEdgeLine(edge, top = false),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            )
         },
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.app_name)) },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                painterResource(R.drawable.ic_px_menu),
-                                contentDescription = "Menu: medicatie en taken beheren",
-                                modifier = Modifier.size(24.dp),
+        bottomBar = {
+            NavigationBar(modifier = Modifier.pixelEdgeLine(edge, top = true)) {
+                val navColors = NavigationBarItemDefaults.colors(
+                    indicatorColor = Color.Transparent,
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                NavigationBarItem(
+                    selected = selected == TAB_TODAY,
+                    onClick = { selected = TAB_TODAY },
+                    icon = { NavIcon(selected == TAB_TODAY, R.drawable.ic_px_home) },
+                    label = { Text("Vandaag") },
+                    colors = navColors,
+                )
+                NavigationBarItem(
+                    selected = selected == TAB_TASKS,
+                    onClick = { selected = TAB_TASKS },
+                    icon = { NavIcon(selected == TAB_TASKS, R.drawable.ic_px_tasks) },
+                    label = { Text("Taken") },
+                    colors = navColors,
+                )
+                NavigationBarItem(
+                    selected = selected == TAB_HISTORY,
+                    onClick = { selected = TAB_HISTORY },
+                    icon = { NavIcon(selected == TAB_HISTORY, R.drawable.ic_px_calendar) },
+                    label = { Text("Medicijnen") },
+                    colors = navColors,
+                )
+                NavigationBarItem(
+                    selected = selected == TAB_PET,
+                    onClick = { selected = TAB_PET },
+                    colors = navColors,
+                    icon = {
+                        val mood = pet?.mood()
+                        PixelTabButton(selected == TAB_PET) {
+                            PixelImage(
+                                when (mood) {
+                                    PetMood.HONGER -> R.drawable.pet_blob_hungry_0
+                                    PetMood.VERDRIETIG -> R.drawable.pet_blob_sad_0
+                                    else -> R.drawable.pet_blob_happy_0
+                                },
+                                contentDescription = when (mood) {
+                                    PetMood.HONGER, PetMood.VERDRIETIG -> "$petName ${mood?.label}"
+                                    else -> null
+                                },
+                                modifier = Modifier.size(28.dp),
                             )
                         }
                     },
-                    // In het tabblad Taken staat rechtsboven de aparte takenreeks.
-                    actions = {
-                        if (selected == TAB_TASKS) {
-                            StreakBadge(taskStreakDays, taskStar, onClick = { showTaskStars = true })
-                        } else {
-                            StreakBadge(streakDays, star, onClick = { showStars = true })
-                        }
-                    },
-                    modifier = Modifier.pixelEdgeLine(edge, top = false),
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
+                    label = { Text(petName, maxLines = 1) },
                 )
-            },
-            bottomBar = {
-                NavigationBar(modifier = Modifier.pixelEdgeLine(edge, top = true)) {
-                    val navColors = NavigationBarItemDefaults.colors(
-                        indicatorColor = Color.Transparent,
-                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    NavigationBarItem(
-                        selected = selected == TAB_TODAY,
-                        onClick = { selected = TAB_TODAY },
-                        icon = { NavIcon(selected == TAB_TODAY, R.drawable.ic_px_home) },
-                        label = { Text("Vandaag") },
-                        colors = navColors,
-                    )
-                    NavigationBarItem(
-                        selected = selected == TAB_TASKS,
-                        onClick = { selected = TAB_TASKS },
-                        icon = { NavIcon(selected == TAB_TASKS, R.drawable.ic_px_tasks) },
-                        label = { Text("Taken") },
-                        colors = navColors,
-                    )
-                    NavigationBarItem(
-                        selected = selected == TAB_HISTORY,
-                        onClick = { selected = TAB_HISTORY },
-                        icon = { NavIcon(selected == TAB_HISTORY, R.drawable.ic_px_calendar) },
-                        label = { Text("Geschiedenis") },
-                        colors = navColors,
-                    )
-                    NavigationBarItem(
-                        selected = selected == TAB_PET,
-                        onClick = { selected = TAB_PET },
-                        colors = navColors,
-                        icon = {
-                            val mood = pet?.mood()
-                            PixelTabButton(selected == TAB_PET) {
-                                PixelImage(
-                                    when (mood) {
-                                        PetMood.HONGER -> R.drawable.pet_blob_hungry_0
-                                        PetMood.VERDRIETIG -> R.drawable.pet_blob_sad_0
-                                        else -> R.drawable.pet_blob_happy_0
-                                    },
-                                    contentDescription = when (mood) {
-                                        PetMood.HONGER, PetMood.VERDRIETIG -> "$petName ${mood?.label}"
-                                        else -> null
-                                    },
-                                    modifier = Modifier.size(28.dp),
-                                )
-                            }
-                        },
-                        label = { Text(petName, maxLines = 1) },
-                    )
-                }
-            },
-        ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                when (selected) {
-                    TAB_TODAY -> TodayScreen(app)
-                    TAB_TASKS -> TasksScreen(app, onOpenStars = { showTaskStars = true })
-                    TAB_HISTORY -> HistoryScreen(app)
-                    else -> PetScreen(app)
-                }
+            }
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when (selected) {
+                TAB_TODAY -> TodayScreen(app)
+                TAB_TASKS -> TasksScreen(app, onOpenStars = { showTaskStars = true })
+                TAB_HISTORY -> MedicationScreen(app, onOpenStars = { showStars = true })
+                else -> PetScreen(app)
             }
         }
     }

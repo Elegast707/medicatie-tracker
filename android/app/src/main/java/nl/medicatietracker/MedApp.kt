@@ -23,6 +23,9 @@ class MedApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Notifications.createChannel(this)
-        appScope.launch { repository.rescheduleAll() }
+        appScope.launch {
+            repository.rescheduleAll()
+            taskRepository.rescheduleAll()
+        }
     }
 }

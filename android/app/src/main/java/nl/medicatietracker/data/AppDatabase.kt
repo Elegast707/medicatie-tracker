@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PetState::class, FoodStock::class, OwnedAccessory::class, FoodReward::class,
         TaskItem::class, TaskLog::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,7 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context, name: String = "medicatie.db"): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
 
         /** Versie 2: instelling per item of overslaan de reeks breekt. */
@@ -93,6 +93,13 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 // Bestaande sterren horen bij de medicatiereeks.
                 db.execSQL("ALTER TABLE `stars` ADD COLUMN `track` TEXT NOT NULL DEFAULT 'MEDICATIE'")
+            }
+        }
+
+        /** Versie 7: elke taak krijgt een tijdstip voor de melding; bestaande taken komen op 12:00. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tasks` ADD COLUMN `minuteOfDay` INTEGER NOT NULL DEFAULT 720")
             }
         }
     }

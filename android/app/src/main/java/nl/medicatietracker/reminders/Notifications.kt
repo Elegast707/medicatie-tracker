@@ -16,6 +16,7 @@ import nl.medicatietracker.R
 import nl.medicatietracker.data.ItemType
 import nl.medicatietracker.data.LogStatus
 import nl.medicatietracker.data.Streaks
+import nl.medicatietracker.data.TaskItem
 import nl.medicatietracker.data.TrackedItem
 import nl.medicatietracker.data.doneLabel
 import nl.medicatietracker.data.formatMinute
@@ -28,6 +29,11 @@ object Notifications {
     private const val TASK_MILESTONE_NOTIFICATION_ID = 888_889
 
     const val ACTION_LOG = "nl.medicatietracker.LOG"
+    const val ACTION_TASK_DONE = "nl.medicatietracker.TASK_DONE"
+    const val EXTRA_TASK_ID = "taskId"
+
+    /** Taken krijgen meldingnummers boven die van medicijnen, zodat ze elkaar niet overschrijven. */
+    private const val TASK_NOTIFICATION_BASE = 2_000_000
     const val EXTRA_ITEM_ID = "itemId"
     const val EXTRA_EPOCH_DAY = "epochDay"
     const val EXTRA_STATUS = "status"
@@ -66,6 +72,37 @@ object Notifications {
         notify(context, item.id.toInt(), builder)
     }
 
+    fun showTaskReminder(context: Context, task: TaskItem, epochDay: Long, isRepeat: Boolean) {
+        val id = taskNotificationId(task.id)
+        val text = buildString {
+            append(if (isRepeat) "Nog niet afgevinkt · gepland om " else "Gepland om ")
+            append(formatMinute(task.minuteOfDay))
+            if (task.details.isNotBlank()) append(" · ").append(task.details)
+        }
+        val intent = Intent(context, TaskActionReceiver::class.java)
+            .setAction(ACTION_TASK_DONE)
+            .putExtra(EXTRA_TASK_ID, task.id)
+            .putExtra(EXTRA_EPOCH_DAY, epochDay)
+        val done = PendingIntent.getBroadcast(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val builder = baseBuilder(context, id, task.name, text).addAction(0, "Gedaan", done)
+        notify(context, id, builder)
+    }
+
+    fun cancelTask(context: Context, taskId: Long) {
+        NotificationManagerCompat.from(context).cancel(taskNotificationId(taskId))
+    }
+
+    private fun taskNotificationId(taskId: Long): Int = TASK_NOTIFICATION_BASE + taskId.toInt()
+
+    /** Felicitatie voor een complete week of maand in de takenreeks. */
+    fun showTaskMilestone(context: Context, title: String, message: String, coins: Int, petName: String) {
+        val text = message + if (coins > 0) " Je verdiende $coins muntjes voor $petName!" else ""
+        val builder = baseBuilder(context, TASK_MILESTONE_NOTIFICATION_ID, "🎉 Taken: $title", text, ACHIEVEMENT_CHANNEL_ID)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+        notify(context, TASK_MILESTONE_NOTIFICATION_ID, builder)
+    }
+
     fun showTest(context: Context) {
         val builder = baseBuilder(
             context,
@@ -76,12 +113,10 @@ object Notifications {
         notify(context, TEST_NOTIFICATION_ID, builder)
     }
 
-    /** Met [tasks] gaat het om de aparte takenreeks; die krijgt een eigen melding. */
-    fun showMilestone(context: Context, milestone: Int, coins: Int, petName: String, tasks: Boolean = false) {
-        val message = if (tasks) "$milestone dagen op rij al je taken gedaan. Ga zo door!" else Streaks.message(milestone)
-        val text = message + if (coins > 0) " Je verdiende $coins muntjes voor $petName!" else ""
-        val title = (if (tasks) "🎉 Taken: " else "🎉 ") + Streaks.title(milestone)
-        val id = if (tasks) TASK_MILESTONE_NOTIFICATION_ID else MILESTONE_NOTIFICATION_ID
+    fun showMilestone(context: Context, milestone: Int, coins: Int, petName: String) {
+        val text = Streaks.message(milestone) + if (coins > 0) " Je verdiende $coins muntjes voor $petName!" else ""
+        val title = "🎉 " + Streaks.title(milestone)
+        val id = MILESTONE_NOTIFICATION_ID
         val builder = baseBuilder(context, id, title, text, ACHIEVEMENT_CHANNEL_ID)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_STATUS)

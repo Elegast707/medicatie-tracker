@@ -6,12 +6,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import nl.medicatietracker.reminders.Notifications
+import nl.medicatietracker.reminders.TaskReminderScheduler
 import java.time.LocalDate
 import java.time.LocalDateTime
 
 private const val PREFS_TASK_ACHIEVEMENTS = "taakprestaties"
-private const val KEY_CELEBRATED_ON = "gevierdOp"
-private const val KEY_MILESTONE = "gevierdeMijlpaal"
+// De reeks telt sinds versie 7 in weken en maanden; daarom nieuwe sleutels.
+private const val KEY_RUN_START = "gevierdeReeksStart"
+private const val KEY_WEEKS = "gevierdeWeken"
+private const val KEY_MONTHS = "gevierdeMaanden"
 
 /** Het tabblad Taken: losse en terugkerende taken met een eigen reeks en eigen sterren. */
 class TaskRepository(
@@ -34,7 +37,7 @@ class TaskRepository(
     suspend fun save(task: TaskItem) {
         val old = if (task.id == 0L) null else dao.task(task.id)
         val today = LocalDate.now()
-        when {
+        val savedId = when {
             old == null -> dao.insert(task.copy(id = 0))
             // Een nieuw schema mag eerdere dagen niet achteraf veranderen (en zo je reeks breken). Daarom
             // stopt de oude taak vandaag en gaat een nieuwe verder; vandaag al afgevinkt blijft afgevinkt.
@@ -43,15 +46,22 @@ class TaskRepository(
                 dao.update(old.copy(deletedAt = now))
                 val newId = dao.insert(task.copy(id = 0, createdAt = now, deletedAt = null))
                 dao.log(old.id, today.toEpochDay())?.let { dao.upsertLog(it.copy(taskId = newId)) }
+                newId
             }
-            else -> dao.update(task)
+            else -> {
+                dao.update(task)
+                task.id
+            }
         }
+        if (old != null && old.id != savedId) cancelReminder(old.id)
+        dao.task(savedId)?.let { reschedule(it) }
         // Een nieuwe of gewijzigde taak kan de dag van vandaag weer open zetten.
         syncStars()
     }
 
     suspend fun delete(task: TaskItem) {
         dao.update(task.copy(deletedAt = System.currentTimeMillis()))
+        cancelReminder(task.id)
         syncStars()
     }
 
@@ -59,6 +69,8 @@ class TaskRepository(
     suspend fun setDone(taskId: Long, epochDay: Long): Food? {
         val task = dao.task(taskId) ?: return null
         dao.upsertLog(TaskLog(taskId, epochDay, System.currentTimeMillis(), task.name))
+        Notifications.cancelTask(context, taskId)
+        reschedule(task)
         val food = pet.grantFoodForTask(taskId, epochDay)
         val coins = syncStars()
         celebrateMilestone(coins)
@@ -67,6 +79,7 @@ class TaskRepository(
 
     suspend fun clearDone(taskId: Long, epochDay: Long) {
         dao.deleteLog(taskId, epochDay)
+        dao.task(taskId)?.let { reschedule(it) }
         syncStars()
     }
 
@@ -76,7 +89,7 @@ class TaskRepository(
      */
     suspend fun syncStars(): Int = starLock.withLock {
         val now = LocalDateTime.now()
-        val streak = TaskRules.streak(dao.allTasks(), dao.allLogs(), now)
+        val streak = TaskRules.streak(dao.allTasks(), dao.allLogs(), now).asStarStreak()
         val changes = Stars.update(streak, starDao.heldStar(StarTrack.TAKEN.name), now.toLocalDate(), StarTrack.TAKEN)
         if (changes.isEmpty()) return@withLock 0
         starDao.saveStars(changes)
@@ -85,23 +98,47 @@ class TaskRepository(
         coins
     }
 
+    /** Zet de meldingen van alle taken opnieuw, bijvoorbeeld na een herstart van de telefoon. */
+    suspend fun rescheduleAll() {
+        dao.allTasks().filter { it.deletedAt == null }.forEach { reschedule(it) }
+    }
+
+    private suspend fun reschedule(task: TaskItem) {
+        if (task.deletedAt != null) {
+            cancelReminder(task.id)
+            return
+        }
+        val doneToday = dao.log(task.id, LocalDate.now().toEpochDay()) != null
+        TaskReminderScheduler.schedule(context, task, doneToday)
+    }
+
+    private fun cancelReminder(taskId: Long) {
+        TaskReminderScheduler.cancel(context, taskId)
+        Notifications.cancelTask(context, taskId)
+    }
+
+    /** Felicitatie bij elke nieuwe complete week of maand, één keer per reeks. */
     private suspend fun celebrateMilestone(coins: Int) {
         val now = LocalDateTime.now()
         val petName = pet.ensurePet().displayName
         val streak = TaskRules.streak(dao.allTasks(), dao.allLogs(), now)
+        val runStart = streak.runStart?.toEpochDay() ?: Long.MIN_VALUE
 
         val prefs = context.getSharedPreferences(PREFS_TASK_ACHIEVEMENTS, Context.MODE_PRIVATE)
-        val celebratedOn = prefs.getLong(KEY_CELEBRATED_ON, Long.MIN_VALUE)
-        val last = Celebration(prefs.getInt(KEY_MILESTONE, 0), celebratedOn).takeIf { celebratedOn != Long.MIN_VALUE }
-        val milestone = Streaks.milestoneToCelebrate(streak, last)
+        // Een nieuwe reeks (na een gemiste taak) begint weer bij nul.
+        val sameRun = prefs.getLong(KEY_RUN_START, Long.MIN_VALUE) == runStart
+        val weeks = if (sameRun) prefs.getInt(KEY_WEEKS, 0) else 0
+        val months = if (sameRun) prefs.getInt(KEY_MONTHS, 0) else 0
+        val milestone = TaskStreaks.milestoneToCelebrate(streak, weeks, months)
         if (milestone == null) {
             if (coins > 0) Notifications.showCoins(context, coins, petName, tasks = true)
             return
         }
         prefs.edit()
-            .putLong(KEY_CELEBRATED_ON, now.toLocalDate().toEpochDay())
-            .putInt(KEY_MILESTONE, milestone)
+            .putLong(KEY_RUN_START, runStart)
+            .putInt(KEY_WEEKS, maxOf(weeks, milestone.weeks))
+            .putInt(KEY_MONTHS, maxOf(months, milestone.months))
             .apply()
-        Notifications.showMilestone(context, milestone, coins, petName, tasks = true)
+        Notifications.showTaskMilestone(context, milestone.title, milestone.message, coins, petName)
     }
 }

@@ -38,6 +38,14 @@
             android:exported="false" />
 
         <receiver
+            android:name=".reminders.TaskAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminders.TaskActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".reminders.RescheduleReceiver"
             android:exported="true">
             <intent-filter>

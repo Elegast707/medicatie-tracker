@@ -59,6 +59,41 @@ class ActionReceiver : BroadcastReceiver() {
 /** Zet alle herinneringen opnieuw na herstart, update, tijd- of tijdzonewijziging. */
 class RescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        runAsync(context) { app -> app.repository.rescheduleAll() }
+        runAsync(context) { app ->
+            app.repository.rescheduleAll()
+            app.taskRepository.rescheduleAll()
+        }
+    }
+}
+
+/** Gaat af op het tijdstip van een taak en daarna elk uur zolang de taak vandaag niet is afgevinkt. */
+class TaskAlarmReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val taskId = intent.getLongExtra(TaskReminderScheduler.EXTRA_TASK_ID, -1L)
+        if (taskId < 0) return
+        runAsync(context) { app ->
+            val dao = app.database.taskDao()
+            val task = dao.task(taskId) ?: return@runAsync
+            if (task.deletedAt != null) return@runAsync
+
+            val now = LocalDateTime.now()
+            val today = now.toLocalDate()
+            val doneToday = dao.log(taskId, today.toEpochDay()) != null
+            val due = today.atStartOfDay().plusMinutes(task.minuteOfDay.toLong())
+            if (task.occursOn(today) && !doneToday && !now.isBefore(due.minusMinutes(1))) {
+                Notifications.showTaskReminder(context, task, today.toEpochDay(), isRepeat = now.isAfter(due.plusMinutes(1)))
+            }
+            TaskReminderScheduler.schedule(context, task, doneToday, now.plusSeconds(30))
+        }
+    }
+}
+
+/** Verwerkt de knop "Gedaan" in de melding van een taak. */
+class TaskActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val taskId = intent.getLongExtra(Notifications.EXTRA_TASK_ID, -1L)
+        val epochDay = intent.getLongExtra(Notifications.EXTRA_EPOCH_DAY, Long.MIN_VALUE)
+        if (taskId < 0 || epochDay == Long.MIN_VALUE) return
+        runAsync(context) { app -> app.taskRepository.setDone(taskId, epochDay) }
     }
 }

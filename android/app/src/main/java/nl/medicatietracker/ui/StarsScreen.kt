@@ -44,6 +44,14 @@ import java.time.format.DateTimeFormatter
 
 private val starDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", DUTCH)
 
+/** Wat je voor een takenster moet doen: de takenreeks telt in weken en maanden. */
+private fun taskTierLabel(tier: StarTier): String = when (tier) {
+    StarTier.BRONS -> "1 week"
+    StarTier.ZILVER -> "1 maand"
+    StarTier.GOUD -> "3 maanden"
+    StarTier.BLAUW -> "1 jaar"
+}
+
 private fun Long.formatDay(): String = LocalDate.ofEpochDay(this).format(starDateFormatter)
 
 /**
@@ -52,7 +60,7 @@ private fun Long.formatDay(): String = LocalDate.ofEpochDay(this).format(starDat
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
+fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit, singular: String = "dag", plural: String = "dagen") {
     if (days < 1 && star == null) return
     Surface(
         onClick = onClick,
@@ -72,7 +80,7 @@ fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                if (days == 1) "dag" else "dagen",
+                if (days == 1) singular else plural,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -107,7 +115,7 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit, tasks: Boolean = fa
         ) { padding ->
             LazyColumn(Modifier.padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
                 item { CurrentStarCard(held, tasks) }
-                item { TierCounts(collected) }
+                item { TierCounts(collected, tasks) }
                 if (collected.isEmpty()) {
                     item {
                         Text(
@@ -149,7 +157,11 @@ private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
                     val next = StarTier.entries.firstOrNull { it > held.tier }
                     if (next != null) {
                         Text(
-                            "Bij ${next.days} dagen op rij krijg je een ${next.label.lowercase(DUTCH)}.",
+                            if (tasks) {
+                                "Doe ${taskTierLabel(next)} op rij al je taken voor een ${next.label.lowercase(DUTCH)}."
+                            } else {
+                                "Bij ${next.days} dagen op rij krijg je een ${next.label.lowercase(DUTCH)}."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -158,7 +170,7 @@ private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
             } else {
                 Text(
                     if (tasks) {
-                        "Je hebt nog geen takenster. Doe ${StarTier.BRONS.days} dagen op rij al je taken voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
+                        "Je hebt nog geen takenster. Doe een hele week (ma t/m zo) al je taken voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
                     } else {
                         "Je hebt nu geen ster. Vink ${StarTier.BRONS.days} dagen op rij alles af voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
                     },
@@ -170,7 +182,7 @@ private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
 }
 
 @Composable
-private fun TierCounts(collected: List<StarEntry>) {
+private fun TierCounts(collected: List<StarEntry>, tasks: Boolean) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
         StarTier.entries.forEach { tier ->
             val count = collected.count { it.tier == tier }
@@ -181,7 +193,7 @@ private fun TierCounts(collected: List<StarEntry>) {
                     modifier = Modifier.size(44.dp).alpha(if (count > 0) 1f else 0.3f),
                 )
                 Text("× $count", style = MaterialTheme.typography.titleSmall)
-                Text("${tier.days} dagen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (tasks) taskTierLabel(tier) else "${tier.days} dagen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
