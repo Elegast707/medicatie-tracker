@@ -183,4 +183,11 @@ interface TaskDao {
 
     @Query("DELETE FROM task_logs WHERE taskId = :taskId AND epochDay = :epochDay")
     suspend fun deleteLog(taskId: Long, epochDay: Long)
+
+    /** Haalt een taak en alles wat ermee is afgevinkt helemaal weg, ook uit eerdere dagen. */
+    @Query("DELETE FROM tasks WHERE id IN (:ids)")
+    suspend fun deleteTasks(ids: List<Long>)
+
+    @Query("DELETE FROM task_logs WHERE taskId IN (:ids)")
+    suspend fun deleteLogsFor(ids: List<Long>)
 }

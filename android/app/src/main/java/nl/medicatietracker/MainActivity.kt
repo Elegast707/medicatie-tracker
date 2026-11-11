@@ -34,6 +34,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -152,21 +154,21 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                     selected = selected == TAB_TODAY,
                     onClick = { selected = TAB_TODAY },
                     icon = { NavIcon(selected == TAB_TODAY, R.drawable.ic_px_home) },
-                    label = { Text("Vandaag") },
+                    label = { TabLabel("Vandaag") },
                     colors = navColors,
                 )
                 NavigationBarItem(
                     selected = selected == TAB_TASKS,
                     onClick = { selected = TAB_TASKS },
                     icon = { NavIcon(selected == TAB_TASKS, R.drawable.ic_px_tasks) },
-                    label = { Text("Taken") },
+                    label = { TabLabel("Taken") },
                     colors = navColors,
                 )
                 NavigationBarItem(
                     selected = selected == TAB_HISTORY,
                     onClick = { selected = TAB_HISTORY },
                     icon = { NavIcon(selected == TAB_HISTORY, R.drawable.ic_px_calendar) },
-                    label = { Text("Medicijnen") },
+                    label = { TabLabel("Medicijnen") },
                     colors = navColors,
                 )
                 NavigationBarItem(
@@ -186,11 +188,11 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                                     PetMood.HONGER, PetMood.VERDRIETIG -> "$petName ${mood?.label}"
                                     else -> null
                                 },
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     },
-                    label = { Text(petName, maxLines = 1) },
+                    label = { TabLabel(petName) },
                 )
             }
         },
@@ -211,6 +213,18 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
     if (showTaskStars) {
         StarCollectionDialog(app, onDismiss = { showTaskStars = false }, tasks = true)
     }
+}
+
+/** Naam onder een tabblad: altijd op één regel, zodat alle knoppen op dezelfde hoogte staan. */
+@Composable
+private fun TabLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

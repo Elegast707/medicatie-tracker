@@ -65,6 +65,23 @@ class TaskRepository(
         syncStars()
     }
 
+    /**
+     * Verwijdert een taak helemaal: ook uit eerdere dagen, de kalender en de meter. Eerdere versies van
+     * dezelfde taak (van voor een schemawijziging) gaan mee. Je reeks wordt opnieuw berekend; eten dat
+     * het blobje al kreeg blijft.
+     */
+    suspend fun deleteCompletely(task: TaskItem) {
+        val ids = dao.allTasks()
+            .filter { it.id == task.id || (it.deletedAt != null && it.name == task.name) }
+            .map { it.id }
+        db.withTransaction {
+            dao.deleteLogsFor(ids)
+            dao.deleteTasks(ids)
+        }
+        ids.forEach { cancelReminder(it) }
+        syncStars()
+    }
+
     /** Vinkt een taak af. Geeft het verdiende eten voor het blobje terug, als er iets verdiend is. */
     suspend fun setDone(taskId: Long, epochDay: Long): Food? {
         val task = dao.task(taskId) ?: return null

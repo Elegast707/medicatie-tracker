@@ -27,6 +27,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -118,6 +119,7 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
     val canTick = !selected.isAfter(today)
     // null = geen dialoog, taak met id 0 = nieuwe taak
     var editing by remember { mutableStateOf<TaskItem?>(null) }
+    var removing by remember { mutableStateOf<TaskItem?>(null) }
     fun newTask() = TaskItem(name = "", startDay = maxOf(selectedDay, epochDay))
 
     Box(Modifier.fillMaxSize()) {
@@ -209,6 +211,38 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
                     TaskListRow(task, today, onClick = { editing = task })
                 }
             }
+            // Eerder verwijderde taken staan nog in de kalender; hier haal je ze er helemaal uit.
+            val activeNames = tasks.map { it.name }.toSet()
+            val removed = allTasks.filter { it.deletedAt != null && it.name !in activeNames }.distinctBy { it.name }
+            if (removed.isNotEmpty()) {
+                item {
+                    Column {
+                    Text(
+                        "Verwijderde taken",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp),
+                    )
+                    Text(
+                        "Deze komen niet meer terug, maar staan nog in eerdere dagen. Tik op de prullenbak om ze er helemaal uit te halen.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    }
+                }
+                items(removed, key = { "weg-${it.id}" }) { task ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(task.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { removing = task }) {
+                            Icon(painterResource(R.drawable.ic_px_trash), contentDescription = "'${task.name}' helemaal verwijderen", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
         }
         PixelButton(
             onClick = { editing = newTask() },
@@ -220,6 +254,21 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
         }
     }
 
+    removing?.let { task ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text("'${task.name}' helemaal verwijderen?") },
+            text = { Text("De taak verdwijnt ook uit eerdere dagen, de kalender en de meter. Je reeks wordt opnieuw berekend.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    app.appScope.launch { app.taskRepository.deleteCompletely(task) }
+                    removing = null
+                }) { Text("Verwijderen", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text("Annuleren") } },
+        )
+    }
+
     editing?.let { task ->
         EditTaskDialog(
             initial = task,
@@ -229,8 +278,10 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
                 app.appScope.launch { app.taskRepository.save(updated) }
                 editing = null
             },
-            onDelete = {
-                app.appScope.launch { app.taskRepository.delete(task) }
+            onDelete = { completely ->
+                app.appScope.launch {
+                    if (completely) app.taskRepository.deleteCompletely(task) else app.taskRepository.delete(task)
+                }
                 editing = null
             },
         )
@@ -332,7 +383,7 @@ private fun EditTaskDialog(
     today: LocalDate,
     onDismiss: () -> Unit,
     onSave: (TaskItem) -> Unit,
-    onDelete: () -> Unit,
+    onDelete: (completely: Boolean) -> Unit,
 ) {
     val isNew = initial.id == 0L
     var name by remember { mutableStateOf(initial.name) }
@@ -475,8 +526,15 @@ private fun EditTaskDialog(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("'${initial.name}' verwijderen?") },
-            text = { Text("De taak komt niet meer terug. Eerdere dagen in je takenreeks blijven kloppen.") },
-            confirmButton = { TextButton(onClick = onDelete) { Text("Verwijderen") } },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Vanaf vandaag: de taak komt niet meer terug, maar eerdere dagen blijven zoals ze waren.")
+                    Text("Helemaal: de taak verdwijnt ook uit eerdere dagen, de kalender en de meter. Je reeks wordt opnieuw berekend.")
+                    TextButton(onClick = { onDelete(false) }) { Text("Vanaf vandaag verwijderen") }
+                    TextButton(onClick = { onDelete(true) }) { Text("Helemaal verwijderen", color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {},
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annuleren") } },
         )
     }
