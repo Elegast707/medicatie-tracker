@@ -27,12 +27,15 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,6 +65,10 @@ import kotlinx.coroutines.withContext
 import nl.medicatietracker.MedApp
 import nl.medicatietracker.R
 import nl.medicatietracker.data.DUTCH
+import nl.medicatietracker.data.History
+import nl.medicatietracker.data.TaskStreak
+import nl.medicatietracker.data.TaskStreaks
+import nl.medicatietracker.data.formatMinute
 import nl.medicatietracker.data.TaskItem
 import nl.medicatietracker.data.TaskLog
 import nl.medicatietracker.data.TaskRecurrence
@@ -73,7 +80,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
-private val taskDayFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM", DUTCH)
 private val shortDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", DUTCH)
 
 private const val DAY_MS = 86_400_000L
@@ -98,6 +104,10 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
     val allTasks by app.taskRepository.allTasks.collectAsStateWithLifecycle(emptyList())
     val logs by app.taskRepository.logs.collectAsStateWithLifecycle(emptyList())
     val streak = remember(allTasks, logs, now) { TaskRules.streak(allTasks, logs, now) }
+    var rangeDays by rememberSaveable { mutableIntStateOf(30) }
+    val summary = remember(allTasks, logs, now, rangeDays) {
+        History.summarize(TaskRules.history(allTasks, logs, today.minusDays(rangeDays - 1L), today, now))
+    }
     // De dag die in de kalender is aangetikt; standaard vandaag.
     var selectedDay by rememberSaveable { mutableLongStateOf(epochDay) }
     var shownMonth by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
@@ -109,34 +119,33 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
     val canTick = !selected.isAfter(today)
     // null = geen dialoog, taak met id 0 = nieuwe taak
     var editing by remember { mutableStateOf<TaskItem?>(null) }
+    var removing by remember { mutableStateOf<TaskItem?>(null) }
     fun newTask() = TaskItem(name = "", startDay = maxOf(selectedDay, epochDay))
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
-            item { ScreenTitle("Taken", today.format(taskDayFormatter).replaceFirstChar { it.uppercase(DUTCH) }) }
-            item { TaskStreakCard(streak.current, streak.best, onOpenStars) }
+            item { ScreenTitle("Taken", today.format(trackerDayFormatter).replaceFirstChar { it.uppercase(DUTCH) }) }
+            item { RangeChips(rangeDays) { rangeDays = it } }
+            item { TaskAchievements(streak, onOpenStars) }
+            item { SummaryCard(summary, showSkipped = false) }
             item {
+                val doneByDay = remember(logs) { logs.groupBy { it.epochDay }.mapValues { (_, l) -> l.map { it.taskId }.toSet() } }
                 MonthCalendar(
                     month = YearMonth.parse(shownMonth),
                     today = today,
                     selected = selected,
-                    tasks = allTasks,
-                    logs = logs,
+                    countFor = { date ->
+                        val planned = TaskRules.tasksOn(allTasks, date)
+                        val done = doneByDay[date.toEpochDay()].orEmpty()
+                        DayCount(planned.count { it.id in done }, planned.size)
+                    },
+                    noun = "taken",
                     onMonthChange = { shownMonth = it.toString() },
                     onSelect = { selectedDay = it.toEpochDay() },
                 )
             }
             item {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (selected == today) "Vandaag" else selected.format(taskDayFormatter).replaceFirstChar { it.uppercase(DUTCH) },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f),
-                    )
+                SelectedDayHeader(selected, today) {
                     if (!selected.isBefore(today)) {
                         PixelButton(onClick = { editing = newTask() }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)) {
                             Icon(painterResource(R.drawable.ic_px_add), contentDescription = "Taak op deze dag toevoegen", tint = Color.White, modifier = Modifier.size(18.dp))
@@ -165,10 +174,11 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
                     }
                 }
                 items(dayTasks, key = { "dag-${it.id}" }) { task ->
-                    TodayTaskCard(
+                    TaskCard(
                         task = task,
                         log = dayLogs[task.id],
                         canTick = canTick,
+                        overdue = selected == today && now.hour * 60 + now.minute >= task.minuteOfDay,
                         onDone = {
                             val day = selectedDay
                             app.appScope.launch {
@@ -201,6 +211,38 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
                     TaskListRow(task, today, onClick = { editing = task })
                 }
             }
+            // Eerder verwijderde taken staan nog in de kalender; hier haal je ze er helemaal uit.
+            val activeNames = tasks.map { it.name }.toSet()
+            val removed = allTasks.filter { it.deletedAt != null && it.name !in activeNames }.distinctBy { it.name }
+            if (removed.isNotEmpty()) {
+                item {
+                    Column {
+                    Text(
+                        "Verwijderde taken",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp),
+                    )
+                    Text(
+                        "Deze komen niet meer terug, maar staan nog in eerdere dagen. Tik op de prullenbak om ze er helemaal uit te halen.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    }
+                }
+                items(removed, key = { "weg-${it.id}" }) { task ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(task.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { removing = task }) {
+                            Icon(painterResource(R.drawable.ic_px_trash), contentDescription = "'${task.name}' helemaal verwijderen", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
         }
         PixelButton(
             onClick = { editing = newTask() },
@@ -212,6 +254,21 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
         }
     }
 
+    removing?.let { task ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text("'${task.name}' helemaal verwijderen?") },
+            text = { Text("De taak verdwijnt ook uit eerdere dagen, de kalender en de meter. Je reeks wordt opnieuw berekend.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    app.appScope.launch { app.taskRepository.deleteCompletely(task) }
+                    removing = null
+                }) { Text("Verwijderen", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text("Annuleren") } },
+        )
+    }
+
     editing?.let { task ->
         EditTaskDialog(
             initial = task,
@@ -221,8 +278,10 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
                 app.appScope.launch { app.taskRepository.save(updated) }
                 editing = null
             },
-            onDelete = {
-                app.appScope.launch { app.taskRepository.delete(task) }
+            onDelete = { completely ->
+                app.appScope.launch {
+                    if (completely) app.taskRepository.deleteCompletely(task) else app.taskRepository.delete(task)
+                }
                 editing = null
             },
         )
@@ -230,30 +289,38 @@ fun TasksScreen(app: MedApp, onOpenStars: () -> Unit) {
 }
 
 @Composable
-private fun TaskStreakCard(current: Int, best: Int, onOpenStars: () -> Unit) {
-    PixelCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clickable(onClick = onOpenStars)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                "Takenreeks: $current ${if (current == 1) "dag" else "dagen"}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "Een dag telt als al je taken van die dag gedaan zijn. Beste reeks: $best. " +
-                    "Deze reeks staat los van je medicatie. Tik voor je takensterren.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+private fun TaskAchievements(streak: TaskStreak, onOpenStars: () -> Unit) {
+    val next = TaskStreaks.BADGES.firstOrNull { !it.earned(streak) }
+    AchievementsCard(
+        current = streak.weeks,
+        currentLabel = if (streak.weeks == 1) "week op rij compleet" else "weken op rij compleet",
+        best = streak.bestWeeks,
+        bestLabel = "beste reeks in weken",
+        badges = TaskStreaks.BADGES.map { BadgeView(it.label, it.earned(streak), it.progress(streak), it.tier.medal) },
+        hint = buildString {
+            if (streak.weekTotal > 0) {
+                append("Deze week ${streak.weekDone} van ${streak.weekTotal} taken gedaan. ")
+            }
+            append("Een week (ma t/m zo) of maand is compleet als alle taken die erin staan gedaan zijn.")
+            next?.let { append(" Volgende badge: '${it.label}'.") }
+        },
+        onClick = onOpenStars,
+    )
 }
 
+/** Een taak om af te vinken, net als een medicijn op Vandaag: tijdstip, naam en een grote groene knop. */
 @Composable
-private fun TodayTaskCard(task: TaskItem, log: TaskLog?, canTick: Boolean, onDone: () -> Unit, onUndo: () -> Unit) {
-    val container = if (log != null) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHighest
+internal fun TaskCard(task: TaskItem, log: TaskLog?, canTick: Boolean, overdue: Boolean, onDone: () -> Unit, onUndo: () -> Unit) {
+    val container = when {
+        log != null -> MaterialTheme.colorScheme.surfaceVariant
+        overdue && canTick -> MaterialTheme.colorScheme.errorContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHighest
+    }
     PixelCard(container = container, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(formatMinute(task.minuteOfDay), style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleMedium)
                     if (task.details.isNotBlank()) {
@@ -288,6 +355,7 @@ private fun TaskListRow(task: TaskItem, today: LocalDate, onClick: () -> Unit) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(task.name, style = MaterialTheme.typography.titleMedium)
             val parts = listOfNotNull(
+                formatMinute(task.minuteOfDay),
                 TaskRules.describe(task) { it.format(shortDateFormatter) },
                 when {
                     next != null -> "volgende: ${next.label(today)}"
@@ -315,7 +383,7 @@ private fun EditTaskDialog(
     today: LocalDate,
     onDismiss: () -> Unit,
     onSave: (TaskItem) -> Unit,
-    onDelete: () -> Unit,
+    onDelete: (completely: Boolean) -> Unit,
 ) {
     val isNew = initial.id == 0L
     var name by remember { mutableStateOf(initial.name) }
@@ -325,6 +393,8 @@ private fun EditTaskDialog(
     // Nieuwe taak op weekdagen: begin met de dag van vandaag aangevinkt.
     var weekdays by remember { mutableIntStateOf(if (initial.weekdays == 0) Weekdays.bit(today.dayOfWeek) else initial.weekdays) }
     var intervalDays by remember { mutableIntStateOf(initial.intervalDays.coerceIn(2, MAX_INTERVAL)) }
+    var minuteOfDay by remember { mutableIntStateOf(initial.minuteOfDay) }
+    var showTimePicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val valid = name.isNotBlank() && (recurrence != TaskRecurrence.WEEKDAGEN || weekdays != 0)
@@ -356,6 +426,9 @@ private fun EditTaskDialog(
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
                     Text((if (recurrence == TaskRecurrence.EENMALIG) "Op " else "Vanaf ") + date.label(today))
                 }
+                OutlinedButton(onClick = { showTimePicker = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+                    Text("Om ${formatMinute(minuteOfDay)}")
+                }
                 when (recurrence) {
                     TaskRecurrence.WEEKDAGEN -> FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         DayOfWeek.entries.forEach { day ->
@@ -378,7 +451,8 @@ private fun EditTaskDialog(
                     else -> Unit
                 }
                 Text(
-                    "Elke taak die je afvinkt levert eten op voor je blobje. Zijn al je taken van een dag gedaan, dan groeit je takenreeks.",
+                    "Op dit tijdstip krijg je een melding, en daarna elk uur opnieuw tot je de taak afvinkt. " +
+                        "Elke taak die je afvinkt levert eten op voor je blobje. Doe je alle taken van een week, dan groeit je takenreeks.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -401,6 +475,7 @@ private fun EditTaskDialog(
                             startDay = startDay,
                             weekdays = if (recurrence == TaskRecurrence.WEEKDAGEN) weekdays else 0,
                             intervalDays = if (recurrence == TaskRecurrence.INTERVAL) intervalDays else initial.intervalDays,
+                            minuteOfDay = minuteOfDay,
                         ),
                     )
                 },
@@ -408,6 +483,22 @@ private fun EditTaskDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuleren") } },
     )
+
+    if (showTimePicker) {
+        val state = rememberTimePickerState(initialHour = minuteOfDay / 60, initialMinute = minuteOfDay % 60, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Tijdstip") },
+            text = { TimePicker(state = state) },
+            confirmButton = {
+                TextButton(onClick = {
+                    minuteOfDay = state.hour * 60 + state.minute
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Annuleren") } },
+        )
+    }
 
     if (showDatePicker) {
         // De datumkiezer rekent in UTC-middernacht; een dag kiezen in het verleden kan niet, behalve de huidige.
@@ -435,8 +526,15 @@ private fun EditTaskDialog(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("'${initial.name}' verwijderen?") },
-            text = { Text("De taak komt niet meer terug. Eerdere dagen in je takenreeks blijven kloppen.") },
-            confirmButton = { TextButton(onClick = onDelete) { Text("Verwijderen") } },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Vanaf vandaag: de taak komt niet meer terug, maar eerdere dagen blijven zoals ze waren.")
+                    Text("Helemaal: de taak verdwijnt ook uit eerdere dagen, de kalender en de meter. Je reeks wordt opnieuw berekend.")
+                    TextButton(onClick = { onDelete(false) }) { Text("Vanaf vandaag verwijderen") }
+                    TextButton(onClick = { onDelete(true) }) { Text("Helemaal verwijderen", color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {},
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Annuleren") } },
         )
     }
@@ -444,127 +542,3 @@ private fun EditTaskDialog(
 
 private const val MAX_INTERVAL = 60
 
-private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", DUTCH)
-
-/**
- * Maandkalender in pixelstijl. Elke dag laat zien hoeveel taken er staan en hoeveel er gedaan zijn:
- * groen als alles gedaan is, rood als er in het verleden iets is blijven liggen. Tik op een dag om de
- * taken van die dag te zien of er een toe te voegen.
- */
-@Composable
-private fun MonthCalendar(
-    month: YearMonth,
-    today: LocalDate,
-    selected: LocalDate,
-    tasks: List<TaskItem>,
-    logs: List<TaskLog>,
-    onMonthChange: (YearMonth) -> Unit,
-    onSelect: (LocalDate) -> Unit,
-) {
-    val doneByDay = remember(logs) { logs.groupBy { it.epochDay }.mapValues { (_, l) -> l.map { it.taskId }.toSet() } }
-    val offset = month.atDay(1).dayOfWeek.value - 1
-    val weeks = (offset + month.lengthOfMonth() + 6) / 7
-    PixelCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PixelButton("<", onClick = { onMonthChange(month.minusMonths(1)) })
-                Text(
-                    month.format(monthFormatter).replaceFirstChar { it.uppercase(DUTCH) },
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f).clickable {
-                        // Tik op de maand om terug te gaan naar vandaag.
-                        onMonthChange(YearMonth.from(today))
-                        onSelect(today)
-                    },
-                )
-                PixelButton(">", onClick = { onMonthChange(month.plusMonths(1)) })
-            }
-            Row(Modifier.fillMaxWidth()) {
-                DayOfWeek.entries.forEach { day ->
-                    Text(
-                        Weekdays.shortLabel(day),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-            for (week in 0 until weeks) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    for (col in 0 until 7) {
-                        val dayOfMonth = week * 7 + col - offset + 1
-                        if (dayOfMonth < 1 || dayOfMonth > month.lengthOfMonth()) {
-                            Spacer(Modifier.weight(1f))
-                        } else {
-                            val date = month.atDay(dayOfMonth)
-                            val planned = TaskRules.tasksOn(tasks, date)
-                            val done = doneByDay[date.toEpochDay()].orEmpty()
-                            CalendarDay(
-                                date = date,
-                                total = planned.size,
-                                done = planned.count { it.id in done },
-                                isToday = date == today,
-                                isSelected = date == selected,
-                                isPast = date.isBefore(today),
-                                onClick = { onSelect(date) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CalendarDay(
-    date: LocalDate,
-    total: Int,
-    done: Int,
-    isToday: Boolean,
-    isSelected: Boolean,
-    isPast: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val fill = when {
-        isSelected -> scheme.primary
-        total > 0 && done == total -> DoneGreen
-        total > 0 && isPast -> scheme.errorContainer
-        total > 0 -> scheme.primaryContainer
-        else -> scheme.surface
-    }
-    val text = when {
-        isSelected -> scheme.onPrimary
-        total > 0 && done == total -> Color.White
-        total > 0 && isPast -> scheme.onErrorContainer
-        total > 0 -> scheme.onPrimaryContainer
-        else -> scheme.onSurface
-    }
-    val edge = if (isToday) scheme.primary else pixelEdge()
-    val light = lerp(fill, Color.White, 0.35f)
-    val shade = lerp(fill, pixelEdge(), 0.25f)
-    val description = buildString {
-        append(date.format(taskDayFormatter))
-        if (total > 0) append(", $done van $total taken gedaan") else append(", geen taken")
-        if (isToday) append(", vandaag")
-    }
-    Column(
-        modifier
-            .height(44.dp)
-            .drawBehind { pixelFrame(fill, light, shade, (if (isToday) 3 else 2).dp.toPx(), edge) }
-            .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("${date.dayOfMonth}", style = MaterialTheme.typography.labelLarge, color = text, fontWeight = if (isToday) FontWeight.Bold else null)
-        if (total > 0) {
-            Text(if (done == total) "✓" else "$done/$total", style = MaterialTheme.typography.labelSmall, color = text)
-        }
-    }
-}

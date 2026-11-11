@@ -58,6 +58,7 @@ import nl.medicatietracker.data.ItemType
 import nl.medicatietracker.data.LogEntry
 import nl.medicatietracker.data.LogStatus
 import nl.medicatietracker.data.RowStatus
+import nl.medicatietracker.data.TaskRules
 import nl.medicatietracker.data.TrackedItem
 import nl.medicatietracker.data.doneLabel
 import nl.medicatietracker.data.formatMinute
@@ -80,6 +81,12 @@ fun TodayScreen(app: MedApp) {
     val nowMinute = now.hour * 60 + now.minute
 
     val context = LocalContext.current
+    // Taken uit het tabblad Taken die vandaag staan; ook verwijderde taken die vandaag al gedaan zijn.
+    val allTasks by app.taskRepository.allTasks.collectAsStateWithLifecycle(emptyList())
+    val taskLogs by app.taskRepository.logs.collectAsStateWithLifecycle(emptyList())
+    val todayTasks = remember(allTasks, epochDay) { TaskRules.tasksOn(allTasks, today) }
+    val taskLogsToday = taskLogs.filter { it.epochDay == epochDay }.associateBy { it.taskId }
+    val tasksDone = todayTasks.count { it.id in taskLogsToday }
     val doneCount = items.count { logsByItem[it.id] != null }
     val title = today.format(dayFormatter).replaceFirstChar { it.uppercase(DUTCH) }
 
@@ -91,7 +98,7 @@ fun TodayScreen(app: MedApp) {
         if (items.isEmpty()) {
             item {
                 Text(
-                    "Er staat nog geen medicatie ingepland. Voeg die toe via het menu linksboven. Taken zet je in het tabblad Taken.",
+                    "Er staat nog geen medicatie ingepland. Voeg die toe onderaan de pagina Medicijnen. Taken zet je in het tabblad Taken.",
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -109,7 +116,7 @@ fun TodayScreen(app: MedApp) {
                 if (group.isEmpty()) continue
                 item(key = "header-$type") {
                     Text(
-                        if (type == ItemType.MEDICATIE) "Medicatie" else "Taken",
+                        if (type == ItemType.MEDICATIE) "Medicatie" else "Oude taken met tijdstip",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
@@ -135,6 +142,37 @@ fun TodayScreen(app: MedApp) {
                         onUndo = { app.appScope.launch { app.repository.clearStatus(item.id, epochDay) } },
                     )
                 }
+            }
+        }
+        if (todayTasks.isNotEmpty()) {
+            item(key = "taken-kop") {
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp)) {
+                    Text("Taken", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.size(4.dp))
+                    Text("$tasksDone van ${todayTasks.size} gedaan", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.size(6.dp))
+                    PixelProgressBar(progress = tasksDone.toFloat() / todayTasks.size)
+                }
+            }
+            items(todayTasks, key = { "taak-${it.id}" }) { task ->
+                TaskCard(
+                    task = task,
+                    log = taskLogsToday[task.id],
+                    canTick = true,
+                    overdue = nowMinute >= task.minuteOfDay,
+                    onDone = {
+                        app.appScope.launch {
+                            val food = app.taskRepository.setDone(task.id, epochDay)
+                            if (food != null) {
+                                val petName = app.petRepository.ensurePet().displayName
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "+1 ${food.label.lowercase(DUTCH)} voor $petName!", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    onUndo = { app.appScope.launch { app.taskRepository.clearDone(task.id, epochDay) } },
+                )
             }
         }
     }

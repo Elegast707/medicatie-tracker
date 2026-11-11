@@ -2,23 +2,18 @@ package nl.medicatietracker.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -58,96 +55,88 @@ private val repeatOptions = listOf(0, 5, 10, 15, 30, 60)
 private fun repeatLabel(minutes: Int): String =
     if (minutes <= 0) "Niet herhalen" else "Elke $minutes minuten herhalen"
 
+/**
+ * Onderaan de pagina Medicijnen: je medicijnen met hun tijdstip en meldingen. Tik op een medicijn om het
+ * te wijzigen; met de schakelaar zet je de herinneringen tijdelijk uit.
+ */
 @Composable
-fun ManageScreen(app: MedApp, onOpenStars: () -> Unit) {
+fun MedicationSettings(app: MedApp) {
     val context = LocalContext.current
     val items by app.repository.items.collectAsStateWithLifecycle(emptyList())
     // null = geen dialoog, item met id 0 = nieuw item
     var editing by remember { mutableStateOf<TrackedItem?>(null) }
 
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
-            item { ScreenTitle("Beheren", "Tik op een item om het te wijzigen") }
-            for (type in ItemType.entries) {
-                val group = items.filter { it.type == type }
-                // Taken hebben nu een eigen tabblad; oude taken met een tijdstip blijven hier zichtbaar.
-                if (type == ItemType.TAAK && group.isEmpty()) continue
-                item(key = "header-$type") {
-                    Text(
-                        if (type == ItemType.MEDICATIE) "Medicatie" else "Taken met tijdstip",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
-                    )
-                }
-                if (group.isEmpty()) {
-                    item(key = "empty-$type") {
-                        Text(
-                            "Nog niets toegevoegd.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-                }
-                items(group, key = { it.id }) { item ->
-                    ListItem(
-                        modifier = Modifier.clickable { editing = item },
-                        leadingContent = {
-                            Text(formatMinute(item.minuteOfDay), style = MaterialTheme.typography.titleMedium)
-                        },
-                        headlineContent = { Text(item.name) },
-                        supportingContent = {
-                            val parts = listOfNotNull(
-                                item.details.takeIf { it.isNotBlank() },
-                                repeatLabel(item.repeatMinutes),
-                                "overslaan mag".takeIf { item.skipAllowed },
-                            )
-                            Text(parts.joinToString(" · "))
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = item.active,
-                                onCheckedChange = { active -> app.appScope.launch { app.repository.save(item.copy(active = active)) } },
-                            )
-                        },
-                    )
-                    HorizontalDivider()
-                }
-            }
-            item {
-                PixelCard(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Meldingen", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Met de schakelaar zet je herinneringen voor een item tijdelijk uit. " +
-                                "Komen meldingen niet of te laat? Zet dan batterijoptimalisatie voor deze app uit.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        OutlinedButton(onClick = { Notifications.showTest(context) }, shape = MaterialTheme.shapes.small) { Text("Testmelding sturen") }
-                    }
-                }
-            }
-            item {
-                PixelCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Sterren", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Brons bij 7 dagen op rij, zilver bij 30, goud bij 90 en blauw bij 365. " +
-                                "Vervangen en verloren sterren bewaar je in je verzameling.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        OutlinedButton(onClick = onOpenStars, shape = MaterialTheme.shapes.small) { Text("Sterrencollectie bekijken") }
-                    }
-                }
+    Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
+        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Medicijnen en meldingen",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f),
+            )
+            PixelButton(
+                onClick = { editing = TrackedItem(name = "", type = ItemType.MEDICATIE, minuteOfDay = 9 * 60) },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Icon(painterResource(R.drawable.ic_px_add), contentDescription = "Medicijn toevoegen", tint = Color.White, modifier = Modifier.size(18.dp))
             }
         }
-        ExtendedFloatingActionButton(
-            onClick = { editing = TrackedItem(name = "", type = ItemType.MEDICATIE, minuteOfDay = 9 * 60) },
-            icon = { Icon(painterResource(R.drawable.ic_px_add), contentDescription = null, modifier = Modifier.size(24.dp)) },
-            text = { Text("Toevoegen") },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-        )
+        for (type in ItemType.entries) {
+            val group = items.filter { it.type == type }
+            // Taken hebben een eigen tabblad; oude taken met een tijdstip blijven hier zichtbaar.
+            if (type == ItemType.TAAK && group.isEmpty()) continue
+            if (type == ItemType.TAAK) {
+                Text(
+                    "Oude taken met tijdstip",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+                )
+            }
+            if (group.isEmpty()) {
+                Text(
+                    "Nog geen medicijnen. Tik op + om er een toe te voegen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            group.forEach { item ->
+                ListItem(
+                    modifier = Modifier.clickable { editing = item },
+                    leadingContent = {
+                        Text(formatMinute(item.minuteOfDay), style = MaterialTheme.typography.titleMedium)
+                    },
+                    headlineContent = { Text(item.name) },
+                    supportingContent = {
+                        val parts = listOfNotNull(
+                            item.details.takeIf { it.isNotBlank() },
+                            repeatLabel(item.repeatMinutes),
+                            "overslaan mag".takeIf { item.skipAllowed },
+                        )
+                        Text(parts.joinToString(" · "))
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = item.active,
+                            onCheckedChange = { active -> app.appScope.launch { app.repository.save(item.copy(active = active)) } },
+                        )
+                    },
+                )
+                HorizontalDivider()
+            }
+        }
+        PixelCard(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Meldingen", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Met de schakelaar zet je herinneringen voor een medicijn tijdelijk uit. " +
+                        "Komen meldingen niet of te laat? Zet dan batterijoptimalisatie voor deze app uit.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = { Notifications.showTest(context) }, shape = MaterialTheme.shapes.small) { Text("Testmelding sturen") }
+            }
+        }
     }
 
     editing?.let { item ->

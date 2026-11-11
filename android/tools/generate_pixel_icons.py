@@ -6,6 +6,7 @@ blijven op elke schermgrootte scherp. Geen extra pakketten nodig.
 
 - ic_px_*: eenkleurige icoontjes op een raster van 12x12; Compose kleurt ze in met `tint`.
 - ic_star_* en ic_check_gold: veelkleurige sterren en het gouden vinkje op 20x20.
+- ic_medal_*: medailles met een vinkje aan een lint voor de takenreeks, op 20x24, in dezelfde kleuren als de sterren.
 """
 import math
 import os
@@ -14,6 +15,20 @@ OUT = os.path.join(os.path.dirname(__file__), '..', 'app', 'src', 'main', 'res',
 
 # Eenkleurige icoontjes, 12x12. '#' is gevuld.
 MONO = {
+    'trash': """
+....####....
+....#..#....
+.##########.
+............
+..########..
+..#.#..#.#..
+..#.#..#.#..
+..#.#..#.#..
+..#.#..#.#..
+..#.#..#.#..
+..########..
+............
+""",
     'check': """
 ............
 ..........##
@@ -176,7 +191,7 @@ def path_for(pixels):
     return ''.join(out)
 
 
-def vector(w, h, layers, size=24):
+def vector(w, h, layers, size=24, height=None):
     paths = '\n'.join(
         f'    <path android:fillColor="{color}" android:pathData="{path_for(px)}" />'
         for color, px in layers.items() if px
@@ -185,7 +200,7 @@ def vector(w, h, layers, size=24):
 <!-- Gegenereerd door tools/generate_pixel_icons.py; niet met de hand aanpassen. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="{size}dp"
-    android:height="{size}dp"
+    android:height="{height or size}dp"
     android:viewportWidth="{w}"
     android:viewportHeight="{h}">
 {paths}
@@ -267,6 +282,52 @@ def check_coin(n=20):
     return vector(n, n, layers, size=48)
 
 
+# Lint van de medaille: omlijning, schaduw, basis, licht.
+RIBBON = ('#2A0A12', '#8E1B2E', '#C8324A', '#EE6A7E')
+
+
+def medal(ramp, w=20, h=24):
+    """Ronde medaille met een wit vinkje, aan een rood lint: de beloning voor de takenreeks."""
+    layers = {c: [] for c in ramp}
+    for c in RIBBON:
+        layers.setdefault(c, [])
+    # Lint: twee schuine banden die boven de medaille in een V samenkomen.
+    for y in range(0, 9):
+        for x0 in (3 + y // 2, 12 - y // 2):
+            for dx in range(5):
+                x = x0 + dx
+                edge = dx in (0, 4) or y == 0
+                layers[RIBBON[0] if edge else RIBBON[2] if dx == 2 else RIBBON[3] if dx == 1 else RIBBON[1]].append((x, y))
+    # Medaille.
+    r = 7.6
+    cx, cy = (w - 1) / 2, h - 1 - r
+    inside = {(x, y) for y in range(h) for x in range(w) if (x - cx) ** 2 + (y - cy) ** 2 <= r * r}
+    for col in layers.values():
+        col[:] = [p for p in col if p not in inside]
+    coin = shaded({(x, y - int(cy - 9.5)) for x, y in inside}, ramp, 20)
+    off = int(cy - 9.5)
+    for col, px in coin.items():
+        layers[col] += [(x, y + off) for x, y in px]
+    # Binnenrand: een ring in de schaduwkleur maakt er een medaille van in plaats van een munt.
+    ring = [(x, y) for (x, y) in inside if 5.2 ** 2 <= (x - cx) ** 2 + (y - cy) ** 2 <= 6.0 ** 2]
+    for p in ring:
+        for col in layers.values():
+            if p in col:
+                col.remove(p)
+    layers[ramp[1]] += ring
+    oy = int(round(cy)) - 10
+    stroke = [(6 + i, 10 + i + oy) for i in range(3)] + [(9 + i, 12 - i + oy) for i in range(5)]
+    tick = [(x, y + dy) for x, y in stroke for dy in (0, -1)]
+    shadow = [(x + 1, y + 1) for x, y in tick if (x + 1, y + 1) not in tick]
+    for p in tick + shadow:
+        for col in layers.values():
+            if p in col:
+                col.remove(p)
+    layers['#FFFFFF'] = tick
+    layers[ramp[0]] += shadow
+    return vector(w, h, layers, size=40, height=48)
+
+
 def write(name, xml):
     with open(os.path.join(OUT, name + '.xml'), 'w') as f:
         f.write(xml)
@@ -277,5 +338,6 @@ if __name__ == '__main__':
         write('ic_px_' + name, mono_xml(rows))
     for name, ramp in STAR_RAMPS.items():
         write('ic_star_' + name, star(ramp))
+        write('ic_medal_' + name, medal(ramp))
     write('ic_check_gold', check_coin())
-    print('Klaar:', len(MONO) + len(STAR_RAMPS) + 1, 'icoontjes')
+    print('Klaar:', len(MONO) + 2 * len(STAR_RAMPS) + 1, 'icoontjes')

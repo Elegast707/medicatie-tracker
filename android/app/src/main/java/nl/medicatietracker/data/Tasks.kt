@@ -1,5 +1,6 @@
 package nl.medicatietracker.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -12,6 +13,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 
 /** Hoe vaak een taak terugkomt. */
 enum class TaskRecurrence { EENMALIG, DAGELIJKS, WEEKDAGEN, INTERVAL }
@@ -32,11 +34,13 @@ data class TaskItem(
     val weekdays: Int = 0,
     /** Bij [TaskRecurrence.INTERVAL]: elke zoveel dagen, gerekend vanaf [startDay]. */
     val intervalDays: Int = 2,
+    /** Tijdstip als minuten na middernacht; standaard 12:00. Hierop komt de eerste melding. */
+    @ColumnInfo(defaultValue = "720") val minuteOfDay: Int = DEFAULT_TASK_MINUTE,
     val createdAt: Long = System.currentTimeMillis(),
     /** Gezet bij verwijderen, zodat eerdere dagen in de reeks blijven kloppen. */
     val deletedAt: Long? = null,
 ) {
-    /** Of het schema anders is dan dat van [other] (naam en notitie tellen niet mee). */
+    /** Of het schema anders is dan dat van [other] (naam, notitie en tijdstip tellen niet mee). */
     fun scheduleDiffers(other: TaskItem): Boolean =
         recurrence != other.recurrence || startDay != other.startDay ||
             weekdays != other.weekdays || intervalDays != other.intervalDays
@@ -56,6 +60,9 @@ data class TaskItem(
         }
     }
 }
+
+/** Standaardtijdstip voor een taak: 12:00. */
+const val DEFAULT_TASK_MINUTE = 12 * 60
 
 /** Een afgevinkte taak op een bepaalde dag. */
 @Entity(tableName = "task_logs", primaryKeys = ["taskId", "epochDay"])
@@ -77,9 +84,9 @@ object Weekdays {
 }
 
 object TaskRules {
-    /** Taken voor [date], op naam gesorteerd. */
+    /** Taken voor [date], op tijdstip en dan op naam gesorteerd. */
     fun tasksOn(tasks: List<TaskItem>, date: LocalDate): List<TaskItem> =
-        tasks.filter { it.occursOn(date) }.sortedBy { it.name.lowercase(DUTCH) }
+        tasks.filter { it.occursOn(date) }.sortedWith(compareBy({ it.minuteOfDay }, { it.name.lowercase(DUTCH) }))
 
     /**
      * Bouwt per dag (nieuwste eerst) op welke taken er stonden en of ze gedaan zijn, in dezelfde vorm
@@ -100,7 +107,7 @@ object TaskRules {
                     date.isBefore(today) -> RowStatus.GEMIST
                     else -> RowStatus.OPEN
                 }
-                HistoryRow(task.id, task.name, ItemType.TAAK, 0, status, log?.doneAt)
+                HistoryRow(task.id, task.name, ItemType.TAAK, task.minuteOfDay, status, log?.doneAt)
             }
             days += HistoryDay(date, rows)
             date = date.minusDays(1)
@@ -111,10 +118,18 @@ object TaskRules {
     fun firstDay(tasks: List<TaskItem>): LocalDate? =
         tasks.minOfOrNull { maxOf(it.startDay, it.createdAt.toLocalDate().toEpochDay()) }?.let(LocalDate::ofEpochDay)
 
-    fun streak(tasks: List<TaskItem>, logs: List<TaskLog>, now: LocalDateTime): StreakInfo {
+    /**
+     * De takenreeks telt in kalenderweken (maandag t/m zondag) en kalendermaanden: zie [TaskStreaks].
+     */
+    fun streak(tasks: List<TaskItem>, logs: List<TaskLog>, now: LocalDateTime): TaskStreak {
         val today = now.toLocalDate()
-        val first = firstDay(tasks)?.takeIf { !it.isAfter(today) } ?: return StreakInfo(0, null, 0)
-        return Streaks.compute(history(tasks, logs, first, today, now))
+        val first = firstDay(tasks) ?: return TaskStreak.NONE
+        if (first.isAfter(today)) return TaskStreak.NONE
+        // Tot het eind van deze week en maand, zodat taken later in de week ook meetellen.
+        val weekEnd = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+        val monthEnd = today.with(TemporalAdjusters.lastDayOfMonth())
+        val days = history(tasks, logs, first, maxOf(weekEnd, monthEnd), now)
+        return TaskStreaks.compute(days, first, today)
     }
 
     /** Korte omschrijving van hoe vaak een taak terugkomt. */
@@ -168,4 +183,11 @@ interface TaskDao {
 
     @Query("DELETE FROM task_logs WHERE taskId = :taskId AND epochDay = :epochDay")
     suspend fun deleteLog(taskId: Long, epochDay: Long)
+
+    /** Haalt een taak en alles wat ermee is afgevinkt helemaal weg, ook uit eerdere dagen. */
+    @Query("DELETE FROM tasks WHERE id IN (:ids)")
+    suspend fun deleteTasks(ids: List<Long>)
+
+    @Query("DELETE FROM task_logs WHERE taskId IN (:ids)")
+    suspend fun deleteLogsFor(ids: List<Long>)
 }

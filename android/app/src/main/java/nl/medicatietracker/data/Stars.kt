@@ -7,13 +7,28 @@ import androidx.room.PrimaryKey
 import nl.medicatietracker.R
 import java.time.LocalDate
 
-/** De ster rechtsboven, op volgorde van laag naar hoog. */
-enum class StarTier(val days: Int, val label: String, @DrawableRes val drawable: Int) {
-    BRONS(7, "Bronzen ster", R.drawable.ic_star_bronze),
-    ZILVER(30, "Zilveren ster", R.drawable.ic_star_silver),
-    GOUD(90, "Gouden ster", R.drawable.ic_star_gold),
-    BLAUW(365, "Blauwe ster", R.drawable.ic_star_blue),
+/**
+ * De beloning rechtsboven, op volgorde van laag naar hoog. Medicijnen verdienen sterren, taken
+ * medailles met een vinkje, in dezelfde kleuren.
+ */
+enum class StarTier(
+    val days: Int,
+    val label: String,
+    @DrawableRes val drawable: Int,
+    val medalLabel: String,
+    @DrawableRes val medal: Int,
+) {
+    BRONS(7, "Bronzen ster", R.drawable.ic_star_bronze, "Bronzen medaille", R.drawable.ic_medal_bronze),
+    ZILVER(30, "Zilveren ster", R.drawable.ic_star_silver, "Zilveren medaille", R.drawable.ic_medal_silver),
+    GOUD(90, "Gouden ster", R.drawable.ic_star_gold, "Gouden medaille", R.drawable.ic_medal_gold),
+    BLAUW(365, "Blauwe ster", R.drawable.ic_star_blue, "Blauwe medaille", R.drawable.ic_medal_blue),
     ;
+
+    /** De afbeelding voor medicijnen (ster) of taken (medaille). */
+    @DrawableRes
+    fun art(tasks: Boolean): Int = if (tasks) medal else drawable
+
+    fun name(tasks: Boolean): String = if (tasks) medalLabel else label
 
     companion object {
         fun forDays(days: Int): StarTier? = entries.lastOrNull { days >= it.days }

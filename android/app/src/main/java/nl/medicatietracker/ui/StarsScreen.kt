@@ -44,6 +44,14 @@ import java.time.format.DateTimeFormatter
 
 private val starDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", DUTCH)
 
+/** Wat je voor een takenmedaille moet doen: de takenreeks telt in weken en maanden. */
+private fun taskTierLabel(tier: StarTier): String = when (tier) {
+    StarTier.BRONS -> "1 week"
+    StarTier.ZILVER -> "1 maand"
+    StarTier.GOUD -> "3 maanden"
+    StarTier.BLAUW -> "1 jaar"
+}
+
 private fun Long.formatDay(): String = LocalDate.ofEpochDay(this).format(starDateFormatter)
 
 /**
@@ -52,7 +60,7 @@ private fun Long.formatDay(): String = LocalDate.ofEpochDay(this).format(starDat
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
+fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit, singular: String = "dag", plural: String = "dagen", tasks: Boolean = false) {
     if (days < 1 && star == null) return
     Surface(
         onClick = onClick,
@@ -72,13 +80,13 @@ fun StreakBadge(days: Int, star: StarEntry?, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                if (days == 1) "dag" else "dagen",
+                if (days == 1) singular else plural,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Image(
-                painter = painterResource(star?.tier?.drawable ?: R.drawable.ic_check_gold),
-                contentDescription = (star?.tier?.label ?: "Reeks loopt") + ", tik voor je verzameling",
+                painter = painterResource(star?.tier?.art(tasks) ?: R.drawable.ic_check_gold),
+                contentDescription = (star?.tier?.name(tasks) ?: "Reeks loopt") + ", tik voor je verzameling",
                 modifier = Modifier.size(32.dp),
             )
         }
@@ -97,7 +105,7 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit, tasks: Boolean = fa
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(if (tasks) "Takensterren" else "Sterrencollectie") },
+                    title = { Text(if (tasks) "Takenmedailles" else "Sterrencollectie") },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) { Icon(painterResource(R.drawable.ic_px_close), contentDescription = "Sluiten", modifier = Modifier.size(24.dp)) }
                     },
@@ -107,12 +115,17 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit, tasks: Boolean = fa
         ) { padding ->
             LazyColumn(Modifier.padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
                 item { CurrentStarCard(held, tasks) }
-                item { TierCounts(collected) }
+                item { TierCounts(collected, tasks) }
                 if (collected.isEmpty()) {
                     item {
                         Text(
-                            "Nog geen sterren verzameld. Een ster komt in je verzameling zodra hij " +
-                                "vervangen wordt door een hogere, of als je reeks breekt.",
+                            if (tasks) {
+                                "Nog geen medailles verzameld. Een medaille komt in je verzameling zodra hij " +
+                                    "vervangen wordt door een hogere, of als je reeks breekt."
+                            } else {
+                                "Nog geen sterren verzameld. Een ster komt in je verzameling zodra hij " +
+                                    "vervangen wordt door een hogere, of als je reeks breekt."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp),
@@ -122,9 +135,9 @@ fun StarCollectionDialog(app: MedApp, onDismiss: () -> Unit, tasks: Boolean = fa
                 items(collected, key = { it.id }) { star ->
                     ListItem(
                         leadingContent = {
-                            Image(painterResource(star.tier.drawable), contentDescription = null, modifier = Modifier.size(36.dp))
+                            Image(painterResource(star.tier.art(tasks)), contentDescription = null, modifier = Modifier.size(36.dp))
                         },
-                        headlineContent = { Text(star.tier.label) },
+                        headlineContent = { Text(star.tier.name(tasks)) },
                         supportingContent = {
                             val end = star.collectedOn?.formatDay().orEmpty()
                             val how = if (star.reason == StarReason.GEBROKEN) "reeks gebroken op $end" else "vervangen op $end"
@@ -142,14 +155,18 @@ private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
     PixelCard(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (held != null) {
-                Image(painterResource(held.tier.drawable), contentDescription = null, modifier = Modifier.size(56.dp))
+                Image(painterResource(held.tier.art(tasks)), contentDescription = null, modifier = Modifier.size(56.dp))
                 Column {
-                    Text(held.tier.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(held.tier.name(tasks), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Sinds ${held.earnedOn.formatDay()}", style = MaterialTheme.typography.bodyMedium)
                     val next = StarTier.entries.firstOrNull { it > held.tier }
                     if (next != null) {
                         Text(
-                            "Bij ${next.days} dagen op rij krijg je een ${next.label.lowercase(DUTCH)}.",
+                            if (tasks) {
+                                "Doe ${taskTierLabel(next)} op rij al je taken voor een ${next.medalLabel.lowercase(DUTCH)}."
+                            } else {
+                                "Bij ${next.days} dagen op rij krijg je een ${next.label.lowercase(DUTCH)}."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -158,7 +175,7 @@ private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
             } else {
                 Text(
                     if (tasks) {
-                        "Je hebt nog geen takenster. Doe ${StarTier.BRONS.days} dagen op rij al je taken voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
+                        "Je hebt nog geen medaille. Doe een hele week (ma t/m zo) al je taken voor een ${StarTier.BRONS.medalLabel.lowercase(DUTCH)}."
                     } else {
                         "Je hebt nu geen ster. Vink ${StarTier.BRONS.days} dagen op rij alles af voor een ${StarTier.BRONS.label.lowercase(DUTCH)}."
                     },
@@ -170,18 +187,18 @@ private fun CurrentStarCard(held: StarEntry?, tasks: Boolean) {
 }
 
 @Composable
-private fun TierCounts(collected: List<StarEntry>) {
+private fun TierCounts(collected: List<StarEntry>, tasks: Boolean) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
         StarTier.entries.forEach { tier ->
             val count = collected.count { it.tier == tier }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(
-                    painterResource(tier.drawable),
+                    painterResource(tier.art(tasks)),
                     contentDescription = null,
                     modifier = Modifier.size(44.dp).alpha(if (count > 0) 1f else 0.3f),
                 )
                 Text("× $count", style = MaterialTheme.typography.titleSmall)
-                Text("${tier.days} dagen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (tasks) taskTierLabel(tier) else "${tier.days} dagen", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gegenereerd door tools/generate_pixel_icons.py; niet met de hand aanpassen. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="12"
+    android:viewportHeight="12">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M4,0h4v1h-4zM4,1h1v1h-1zM7,1h1v1h-1zM1,2h10v1h-10zM2,4h8v1h-8zM2,5h1v1h-1zM4,5h1v1h-1zM7,5h1v1h-1zM9,5h1v1h-1zM2,6h1v1h-1zM4,6h1v1h-1zM7,6h1v1h-1zM9,6h1v1h-1zM2,7h1v1h-1zM4,7h1v1h-1zM7,7h1v1h-1zM9,7h1v1h-1zM2,8h1v1h-1zM4,8h1v1h-1zM7,8h1v1h-1zM9,8h1v1h-1zM2,9h1v1h-1zM4,9h1v1h-1zM7,9h1v1h-1zM9,9h1v1h-1zM2,10h8v1h-8z" />
+</vector>

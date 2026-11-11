@@ -57,7 +57,7 @@ class MigrationTest {
         assertEquals(1, count("logs"))
         assertEquals(0, count("pet"))
         assertEquals(0, count("stars"))
-        assertEquals(6, sql.version)
+        assertEquals(7, sql.version)
         db.close()
     }
 
@@ -86,7 +86,7 @@ class MigrationTest {
         val before = System.currentTimeMillis()
         val db = AppDatabase.build(context, name)
         val sql = db.openHelper.writableDatabase
-        assertEquals(6, sql.version)
+        assertEquals(7, sql.version)
         sql.query("SELECT name, coins, head, fullnessAt, happiness, happinessAt FROM pet").use {
             it.moveToFirst()
             assertEquals("Bolle", it.getString(0))
@@ -117,13 +117,46 @@ class MigrationTest {
 
         val db = AppDatabase.build(context, name)
         val sql = db.openHelper.writableDatabase
-        assertEquals(6, sql.version)
+        assertEquals(7, sql.version)
         sql.query("SELECT tier, track FROM stars").use {
             it.moveToFirst()
             assertEquals("BRONS", it.getString(0))
             assertEquals("MEDICATIE", it.getString(1))
         }
         sql.query("SELECT COUNT(*) FROM tasks").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+        db.close()
+    }
+
+    @Test
+    fun migratesFromVersion6To7AndGivesExistingTasksNoon() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(name)
+
+        AppDatabase.build(context, name).apply {
+            openHelper.writableDatabase
+            close()
+        }
+        // Zet de takentabel terug naar versie 6: zonder tijdstip.
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { raw ->
+            raw.execSQL("DROP TABLE `tasks`")
+            raw.execSQL(
+                "CREATE TABLE `tasks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, `details` TEXT NOT NULL, `recurrence` TEXT NOT NULL, " +
+                    "`startDay` INTEGER NOT NULL, `weekdays` INTEGER NOT NULL, `intervalDays` INTEGER NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL, `deletedAt` INTEGER)",
+            )
+            raw.execSQL("INSERT INTO tasks (name, details, recurrence, startDay, weekdays, intervalDays, createdAt) VALUES ('Afwas', '', 'DAGELIJKS', 20000, 0, 2, 0)")
+            raw.version = 6
+        }
+
+        val db = AppDatabase.build(context, name)
+        val sql = db.openHelper.writableDatabase
+        assertEquals(7, sql.version)
+        sql.query("SELECT name, minuteOfDay FROM tasks").use {
+            it.moveToFirst()
+            assertEquals("Afwas", it.getString(0))
+            assertEquals(720, it.getInt(1))
+        }
         db.close()
     }
 }
