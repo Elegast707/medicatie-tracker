@@ -1,5 +1,6 @@
 package nl.medicatietracker.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -58,7 +59,12 @@ internal fun RangeChips(rangeDays: Int, onChange: (Int) -> Unit) {
 }
 
 /** Een badge zoals hij in het blok getoond wordt. */
-internal data class BadgeView(val label: String, val earned: Boolean, val progress: String)
+internal data class BadgeView(
+    val label: String,
+    val earned: Boolean,
+    val progress: String,
+    @DrawableRes val art: Int = R.drawable.ic_star_gold,
+)
 
 /**
  * Het blok met de huidige reeks, de beste reeks en de badges. Tikken opent de sterrenverzameling.
@@ -109,7 +115,7 @@ private fun BadgeTile(badge: BadgeView, modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (badge.earned) {
-                Image(painterResource(R.drawable.ic_star_gold), contentDescription = "Behaald", modifier = Modifier.size(24.dp))
+                Image(painterResource(badge.art), contentDescription = "Behaald", modifier = Modifier.size(24.dp))
             } else {
                 Text(badge.progress, style = MaterialTheme.typography.labelSmall, maxLines = 1)
             }

@@ -130,7 +130,7 @@ private fun AppRoot(app: MedApp, star: StarEntry?) {
                 // In het tabblad Taken staat rechtsboven de aparte takenreeks, in weken.
                 actions = {
                     if (selected == TAB_TASKS) {
-                        StreakBadge(taskStreakWeeks, taskStar, onClick = { showTaskStars = true }, singular = "week", plural = "weken")
+                        StreakBadge(taskStreakWeeks, taskStar, onClick = { showTaskStars = true }, singular = "week", plural = "weken", tasks = true)
                     } else {
                         StreakBadge(streakDays, star, onClick = { showStars = true })
                     }

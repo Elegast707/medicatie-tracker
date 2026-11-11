@@ -84,7 +84,7 @@ class TaskRepository(
     }
 
     /**
-     * Zet de takenster gelijk met de takenreeks, net als bij medicatie. Elke nieuw verdiende ster levert
+     * Zet de takenmedaille gelijk met de takenreeks, net als de ster bij medicatie. Elke nieuwe medaille levert
      * muntjes op voor het blobje; geeft het aantal muntjes terug.
      */
     suspend fun syncStars(): Int = starLock.withLock {

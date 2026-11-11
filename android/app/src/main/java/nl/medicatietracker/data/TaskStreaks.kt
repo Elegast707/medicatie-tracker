@@ -27,7 +27,7 @@ data class TaskStreak(
     val weekTotal: Int = 0,
 ) {
     /**
-     * Dezelfde reeks uitgedrukt in de dagen die [StarTier] gebruikt, zodat de takensterren dezelfde
+     * Dezelfde reeks uitgedrukt in de dagen die [StarTier] gebruikt, zodat de takenmedailles dezelfde
      * stappen volgen: brons voor een week, zilver voor een maand, goud voor 3 maanden, blauw voor een jaar.
      */
     fun asStarStreak(): StreakInfo = StreakInfo(starDays(weeks, months), runStart, starDays(bestWeeks, bestMonths))
@@ -46,7 +46,7 @@ data class TaskStreak(
 }
 
 /** Een badge voor de takenreeks: zoveel complete weken of maanden op rij. */
-data class TaskBadge(val label: String, val weeks: Int = 0, val months: Int = 0) {
+data class TaskBadge(val label: String, val tier: StarTier, val weeks: Int = 0, val months: Int = 0) {
     fun earned(streak: TaskStreak): Boolean =
         if (months > 0) streak.bestMonths >= months else streak.bestWeeks >= weeks
 
@@ -58,11 +58,11 @@ data class TaskBadge(val label: String, val weeks: Int = 0, val months: Int = 0)
 object TaskStreaks {
     /** Zelfde stappen als de medicatiebadges, maar dan in kalenderweken en -maanden. */
     val BADGES = listOf(
-        TaskBadge("Week", weeks = 1),
-        TaskBadge("Maand", months = 1),
-        TaskBadge("3 mnd", months = 3),
-        TaskBadge("½ jaar", months = 6),
-        TaskBadge("Jaar", months = 12),
+        TaskBadge("Week", StarTier.BRONS, weeks = 1),
+        TaskBadge("Maand", StarTier.ZILVER, months = 1),
+        TaskBadge("3 mnd", StarTier.GOUD, months = 3),
+        TaskBadge("½ jaar", StarTier.GOUD, months = 6),
+        TaskBadge("Jaar", StarTier.BLAUW, months = 12),
     )
 
     private enum class Result { COMPLETE, BROKEN, PENDING, EMPTY }

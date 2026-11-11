@@ -245,7 +245,7 @@ private fun TaskAchievements(streak: TaskStreak, onOpenStars: () -> Unit) {
         currentLabel = if (streak.weeks == 1) "week op rij compleet" else "weken op rij compleet",
         best = streak.bestWeeks,
         bestLabel = "beste reeks in weken",
-        badges = TaskStreaks.BADGES.map { BadgeView(it.label, it.earned(streak), it.progress(streak)) },
+        badges = TaskStreaks.BADGES.map { BadgeView(it.label, it.earned(streak), it.progress(streak), it.tier.medal) },
         hint = buildString {
             if (streak.weekTotal > 0) {
                 append("Deze week ${streak.weekDone} van ${streak.weekTotal} taken gedaan. ")

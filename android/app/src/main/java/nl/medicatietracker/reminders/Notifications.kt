@@ -125,7 +125,7 @@ object Notifications {
 
     fun showCoins(context: Context, coins: Int, petName: String, tasks: Boolean = false) {
         val id = if (tasks) TASK_MILESTONE_NOTIFICATION_ID else MILESTONE_NOTIFICATION_ID
-        val title = if (tasks) "⭐ Nieuwe takenster!" else "⭐ Nieuwe ster!"
+        val title = if (tasks) "🏅 Nieuwe medaille voor je taken!" else "⭐ Nieuwe ster!"
         val builder = baseBuilder(context, id, title, "Je verdiende $coins muntjes voor $petName!", ACHIEVEMENT_CHANNEL_ID)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_STATUS)

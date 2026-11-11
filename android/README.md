@@ -24,9 +24,9 @@ Een Android-app om dagelijkse medicatie en taken bij te houden, met herinneringe
   week (maandag t/m zondag) is compleet als alle taken die erin stonden gedaan zijn; dagen zonder taken
   doen niet mee, en een week zonder taken breekt de reeks niet maar geeft ook geen badge. Eén gemiste
   taak breekt de reeks. Badges: een week, een maand, 3 maanden, een half jaar en een jaar op rij.
-  Takensterren: brons voor een week, zilver voor een maand, goud voor 3 maanden, blauw voor een jaar.
-  In het tabblad Taken staat rechtsboven je takenreeks in weken; tik erop voor je takensterren. Elke
-  afgevinkte taak levert eten op voor je blobje, en elke nieuwe takenster muntjes.
+  Taken verdienen geen sterren maar medailles met een vinkje: brons voor een week, zilver voor een maand, goud voor 3 maanden, blauw voor een jaar.
+  In het tabblad Taken staat rechtsboven je takenreeks in weken; tik erop voor je medailles. Elke
+  afgevinkte taak levert eten op voor je blobje, en elke nieuwe medaille muntjes.
 - **Prestaties**: heb je alles afgevinkt, dan groeit je reeks. Bij 7, 30 en 90 dagen op rij krijg
   je een felicitatie, en als je doorgaat ook elke volgende week en bij 180 en 365 dagen. Op
   Medicijnen zie je je badges, je huidige reeks en je beste reeks ooit.
